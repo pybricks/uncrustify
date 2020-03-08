@@ -8,6 +8,7 @@
  */
 
 #include "align_nl_cont.h"
+
 #include "align_add.h"
 #include "ChunkStack.h"
 #include "uncrustify.h"
@@ -24,6 +25,7 @@ chunk_t *align_nl_cont(chunk_t *start)
    ChunkStack cs;
    size_t     max_col = 0;
    chunk_t    *pc     = start;
+
    while (  pc != nullptr
          && pc->type != CT_NEWLINE
          && pc->type != CT_COMMENT_MULTI)
@@ -34,15 +36,14 @@ chunk_t *align_nl_cont(chunk_t *start)
       }
       pc = chunk_get_next(pc);
    }
-
    // NL_CONT is always the last thing on a line
    chunk_t *tmp;
+
    while ((tmp = cs.Pop_Back()) != nullptr)
    {
       chunk_flags_set(tmp, PCF_WAS_ALIGNED);
       tmp->column = max_col;
    }
-
    return(pc);
 } // align_nl_cont
 
@@ -51,6 +52,7 @@ void align_backslash_newline(void)
 {
    LOG_FUNC_ENTRY();
    chunk_t *pc = chunk_get_head();
+
    while (pc != nullptr)
    {
       if (pc->type != CT_NL_CONT)

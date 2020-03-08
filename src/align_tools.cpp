@@ -8,8 +8,9 @@
  */
 
 #include "align_tools.h"
-#include "uncrustify.h"
+
 #include "space.h"
+#include "uncrustify.h"
 
 
 chunk_t *skip_c99_array(chunk_t *sq_open)
@@ -36,6 +37,7 @@ chunk_t *scan_ib_line(chunk_t *start, bool first_pass)
 
    // Skip past C99 "[xx] =" stuff
    chunk_t *tmp = skip_c99_array(start);
+
    if (tmp != nullptr)
    {
       set_chunk_parent(start, CT_TSQUARE);
@@ -58,6 +60,7 @@ chunk_t *scan_ib_line(chunk_t *start, bool first_pass)
       //        pc->text(), pc->column, pc->orig_col, pc->orig_line);
 
       chunk_t *next = chunk_get_next(pc);
+
       if (next == nullptr || chunk_is_comment(next))
       {
          // do nothing
@@ -84,6 +87,7 @@ chunk_t *scan_ib_line(chunk_t *start, bool first_pass)
             cpd.al[cpd.al_cnt].col  = pc->column;
             cpd.al[cpd.al_cnt].len  = token_width;
             cpd.al_cnt++;
+
             if (cpd.al_cnt == AL_SIZE)
             {
                fprintf(stderr, "Number of 'entry' to be aligned is too big for the current value %d,\n", AL_SIZE);
@@ -120,6 +124,7 @@ chunk_t *scan_ib_line(chunk_t *start, bool first_pass)
                           __func__, __LINE__, prev_match->text(), prev_match->orig_line, prev_match->orig_col);
                   int min_col_diff = pc->column - prev_match->column;
                   int cur_col_diff = cpd.al[idx].col - cpd.al[idx - 1].col;
+
                   if (cur_col_diff < min_col_diff)
                   {
                      LOG_FMT(LSIB, "%s(%d):   pc->orig_line is %zu\n",

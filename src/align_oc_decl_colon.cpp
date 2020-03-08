@@ -8,9 +8,11 @@
  */
 
 #include "align_oc_decl_colon.h"
+
 #include "align_oc_msg_colons.h"
-#include "chunk_list.h"
 #include "align_stack.h"
+#include "chunk_list.h"
+
 
 using namespace uncrustify;
 
@@ -27,6 +29,7 @@ void align_oc_decl_colon(void)
    nas.m_right_align = !options::align_on_tabstop();
 
    chunk_t *pc = chunk_get_head();
+
    while (pc != nullptr)
    {
       if (pc->type != CT_OC_SCOPE)
@@ -34,7 +37,6 @@ void align_oc_decl_colon(void)
          pc = chunk_get_next(pc);
          continue;
       }
-
       nas.Reset();
       cas.Reset();
 

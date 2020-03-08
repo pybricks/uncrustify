@@ -5,18 +5,20 @@
  * @author  Ben Gardner
  * @license GPL v2+
  */
+
 #include "semicolons.h"
-#include "uncrustify_types.h"
+
 #include "chunk_list.h"
 #include "ChunkStack.h"
-#include "prototypes.h"
-#include "uncrustify.h"
 #include "language_tools.h"
+#include "prototypes.h"
+#include "unc_ctype.h"
+#include "uncrustify.h"
+#include "uncrustify_types.h"
 
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
-#include "unc_ctype.h"
 
 
 static void remove_semicolon(chunk_t *pc);
@@ -46,12 +48,14 @@ void remove_extra_semicolons(void)
    LOG_FUNC_ENTRY();
 
    chunk_t *pc = chunk_get_head();
+
    while (pc != nullptr)
    {
       chunk_t *next = chunk_get_next_ncnl(pc);
       chunk_t *prev;
+
       if (  chunk_is_token(pc, CT_SEMICOLON)
-         && !(pc->flags & PCF_IN_PREPROC)
+         && !pc->flags.test(PCF_IN_PREPROC)
          && (prev = chunk_get_prev_ncnl(pc)) != nullptr)
       {
          LOG_FMT(LSCANSEMI, "%s(%d): Semi orig_line is %zu, orig_col is %zu, parent is %s, prev = '%s' [%s/%s]\n",
@@ -109,7 +113,6 @@ void remove_extra_semicolons(void)
             remove_semicolon(pc);
          }
       }
-
       pc = next;
    }
 } // remove_extra_semicolons
@@ -120,6 +123,7 @@ static void check_unknown_brace_close(chunk_t *semi, chunk_t *brace_close)
    LOG_FUNC_ENTRY();
    chunk_t *pc = chunk_get_prev_type(brace_close, CT_BRACE_OPEN, brace_close->level);
    pc = chunk_get_prev_ncnl(pc);
+
    if (  pc != nullptr
       && pc->type != CT_RETURN
       && pc->type != CT_WORD

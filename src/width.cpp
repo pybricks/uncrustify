@@ -7,12 +7,14 @@
  */
 
 #include "width.h"
-#include "uncrustify_types.h"
+
 #include "chunk_list.h"
-#include "prototypes.h"
-#include "uncrustify.h"
+#include "error_types.h"
 #include "indent.h"
 #include "newlines.h"
+#include "prototypes.h"
+#include "uncrustify.h"
+#include "uncrustify_types.h"
 
 #include <cstdlib>
 
@@ -167,8 +169,8 @@ void do_code_width(void)
          {
             continue;
          }
-
          bool split_OK = split_line(pc);
+
          if (split_OK)
          {
             LOG_FMT(LSPLIT, "%s(%d): on orig_line=%zu, orig_col=%zu, for %s\n",
@@ -219,6 +221,7 @@ static size_t get_split_pri(c_token_t tok)
          return(token.pri);
       }
    }
+
    return(0);
 }
 
@@ -230,15 +233,16 @@ static void try_split_here(cw_entry &ent, chunk_t *pc)
    LOG_FMT(LSPLIT, "%s(%d): at %s, orig_col=%zu\n", __func__, __LINE__, pc->text(), pc->orig_col);
    size_t pc_pri = get_split_pri(pc->type);
    LOG_FMT(LSPLIT, "%s(%d): pc_pri is %zu\n", __func__, __LINE__, pc_pri);
+
    if (pc_pri == 0)
    {
       LOG_FMT(LSPLIT, "%s(%d): pc_pri is 0, return\n", __func__, __LINE__);
       return;
    }
-
    LOG_FMT(LSPLIT, "%s(%d):\n", __func__, __LINE__);
    // Can't split after a newline
    chunk_t *prev = chunk_get_prev(pc);
+
    if (  prev == nullptr
       || (chunk_is_newline(prev) && chunk_is_not_token(pc, CT_STRING)))
    {
@@ -249,54 +253,57 @@ static void try_split_here(cw_entry &ent, chunk_t *pc)
       }
       return;
    }
-
    LOG_FMT(LSPLIT, "%s(%d):\n", __func__, __LINE__);
+
    // Can't split a function without arguments
    if (chunk_is_token(pc, CT_FPAREN_OPEN))
    {
       chunk_t *next = chunk_get_next(pc);
+
       if (chunk_is_token(next, CT_FPAREN_CLOSE))
       {
          LOG_FMT(LSPLIT, "%s(%d): Can't split a function without arguments, return\n", __func__, __LINE__);
          return;
       }
    }
-
    LOG_FMT(LSPLIT, "%s(%d):\n", __func__, __LINE__);
+
    // Only split concatenated strings
    if (chunk_is_token(pc, CT_STRING))
    {
       chunk_t *next = chunk_get_next(pc);
+
       if (chunk_is_not_token(next, CT_STRING))
       {
          LOG_FMT(LSPLIT, "%s(%d): Only split concatenated strings, return\n", __func__, __LINE__);
          return;
       }
    }
-
    LOG_FMT(LSPLIT, "%s(%d):\n", __func__, __LINE__);
+
    // keep common groupings unless ls_code_width
    if (!options::ls_code_width() && pc_pri >= 20)
    {
       LOG_FMT(LSPLIT, "%s(%d): keep common groupings unless ls_code_width, return\n", __func__, __LINE__);
       return;
    }
-
    LOG_FMT(LSPLIT, "%s(%d):\n", __func__, __LINE__);
+
    // don't break after last term of a qualified type
    if (pc_pri == 25)
    {
       chunk_t *next = chunk_get_next(pc);
+
       if (chunk_is_not_token(next, CT_WORD) && (get_split_pri(next->type) != 25))
       {
          LOG_FMT(LSPLIT, "%s(%d): don't break after last term of a qualified type, return\n", __func__, __LINE__);
          return;
       }
    }
-
    LOG_FMT(LSPLIT, "%s(%d):\n", __func__, __LINE__);
    // Check levels first
    bool change = false;
+
    if (ent.pc == nullptr || pc->level < ent.pc->level)
    {
       LOG_FMT(LSPLIT, "%s(%d):\n", __func__, __LINE__);
@@ -310,8 +317,8 @@ static void try_split_here(cw_entry &ent, chunk_t *pc)
          change = true;
       }
    }
-
    LOG_FMT(LSPLIT, "%s(%d): change is %s\n", __func__, __LINE__, change ? "TRUE" : "FALSE");
+
    if (change)
    {
       LOG_FMT(LSPLIT, "%s(%d): do the change\n", __func__, __LINE__);
@@ -330,11 +337,11 @@ static bool split_line(chunk_t *start)
    log_pcf_flags(LSPLIT, start->flags);
    LOG_FMT(LSPLIT, "   start->parent_type %s, (PCF_IN_FCN_DEF is %s), (PCF_IN_FCN_CALL is %s)\n",
            get_token_name(start->parent_type),
-           ((start->flags & (PCF_IN_FCN_DEF)) != 0) ? "TRUE" : "FALSE",
-           ((start->flags & (PCF_IN_FCN_CALL)) != 0) ? "TRUE" : "FALSE");
+           start->flags.test((PCF_IN_FCN_DEF)) ? "TRUE" : "FALSE",
+           start->flags.test((PCF_IN_FCN_CALL)) ? "TRUE" : "FALSE");
 
    // break at maximum line length if ls_code_width is true
-   if (start->flags & PCF_ONE_LINER)
+   if (start->flags.test(PCF_ONE_LINER))
    {
       LOG_FMT(LSPLIT, "%s(%d): ** ONCE LINER SPLIT **\n", __func__, __LINE__);
       undo_one_liner(start);
@@ -343,16 +350,17 @@ static bool split_line(chunk_t *start)
       cpd.changes++;
       return(false);
    }
-
    LOG_FMT(LSPLIT, "%s(%d):\n", __func__, __LINE__);
+
    if (options::ls_code_width())
    {
    }
    // Check to see if we are in a for statement
-   else if (start->flags & PCF_IN_FOR)
+   else if (start->flags.test(PCF_IN_FOR))
    {
       LOG_FMT(LSPLIT, " ** FOR SPLIT **\n");
       split_for_stmt(start);
+
       if (!is_past_width(start))
       {
          return(true);
@@ -364,16 +372,17 @@ static bool split_line(chunk_t *start)
     * If this is in a function call or prototype, split on commas or right
     * after the open parenthesis
     */
-   else if (  (start->flags & PCF_IN_FCN_DEF)
+   else if (  start->flags.test(PCF_IN_FCN_DEF)
            || start->parent_type == CT_FUNC_PROTO            // Issue #1169
            || (  (start->level == (start->brace_level + 1))
-              && (start->flags & PCF_IN_FCN_CALL)))
+              && start->flags.test(PCF_IN_FCN_CALL)))
    {
       LOG_FMT(LSPLIT, " ** FUNC SPLIT **\n");
 
       if (options::ls_func_split_full())
       {
          split_fcn_params_full(start);
+
          if (!is_past_width(start))
          {
             return(true);
@@ -386,13 +395,12 @@ static bool split_line(chunk_t *start)
    /*
     * If this is in a template, split on commas, Issue #1170
     */
-   else if (start->flags & PCF_IN_TEMPLATE)
+   else if (start->flags.test(PCF_IN_TEMPLATE))
    {
       LOG_FMT(LSPLIT, " ** TEMPLATE SPLIT **\n");
       split_template(start);
       return(true);
    }
-
    LOG_FMT(LSPLIT, "%s(%d):\n", __func__, __LINE__);
    // Try to find the best spot to split the line
    cw_entry ent;
@@ -405,9 +413,11 @@ static bool split_line(chunk_t *start)
    {
       LOG_FMT(LSPLIT, "%s(%d): at %s, orig_line is %zu, orig_col is %zu\n",
               __func__, __LINE__, pc->text(), pc->orig_line, pc->orig_col);
+
       if (chunk_is_not_token(pc, CT_SPACE))
       {
          try_split_here(ent, pc);
+
          // break at maximum line length
          if (ent.pc != nullptr && (options::ls_code_width()))
          {
@@ -462,6 +472,7 @@ static bool split_line(chunk_t *start)
    if (pc == nullptr)
    {
       pc = start;
+
       // Don't break before a close, comma, or colon
       if (  chunk_is_token(start, CT_PAREN_CLOSE)
          || chunk_is_token(start, CT_PAREN_OPEN)
@@ -482,9 +493,9 @@ static bool split_line(chunk_t *start)
          return(true);
       }
    }
-
    // add a newline before pc
    prev = chunk_get_prev(pc);
+
    if (  prev != nullptr
       && !chunk_is_newline(pc)
       && !chunk_is_newline(prev))
@@ -525,6 +536,7 @@ static void split_for_stmt(chunk_t *start)
 
    // Find the open paren so we know the level and count newlines
    chunk_t *pc = start;
+
    while ((pc = chunk_get_prev(pc)) != nullptr)
    {
       if (chunk_is_token(pc, CT_SPAREN_OPEN))
@@ -532,21 +544,23 @@ static void split_for_stmt(chunk_t *start)
          open_paren = pc;
          break;
       }
+
       if (pc->nl_count > 0)
       {
          nl_cnt += pc->nl_count;
       }
    }
+
    if (open_paren == nullptr)
    {
       LOG_FMT(LSPLIT, "No open paren\n");
       return;
    }
-
    // see if we started on the semicolon
    int     count = 0;
    chunk_t *st[2];
    pc = start;
+
    if (chunk_is_token(pc, CT_SEMICOLON) && pc->parent_type == CT_FOR)
    {
       st[count++] = pc;
@@ -555,19 +569,19 @@ static void split_for_stmt(chunk_t *start)
    // first scan backwards for the semicolons
    while (  (count < static_cast<int>(max_cnt))
          && ((pc = chunk_get_prev(pc)) != nullptr)
-         && (pc->flags & PCF_IN_SPAREN))
+         && pc->flags.test(PCF_IN_SPAREN))
    {
       if (chunk_is_token(pc, CT_SEMICOLON) && pc->parent_type == CT_FOR)
       {
          st[count++] = pc;
       }
    }
-
    // And now scan forward
    pc = start;
+
    while (  (count < static_cast<int>(max_cnt))
          && ((pc = chunk_get_next(pc)) != nullptr)
-         && (pc->flags & PCF_IN_SPAREN))
+         && pc->flags.test(PCF_IN_SPAREN))
    {
       if (chunk_is_token(pc, CT_SEMICOLON) && pc->parent_type == CT_FOR)
       {
@@ -586,28 +600,30 @@ static void split_for_stmt(chunk_t *start)
    {
       return;
    }
-
    // Still past width, check for commas at parenthese level
    pc = open_paren;
+
    while ((pc = chunk_get_next(pc)) != start)
    {
       if (chunk_is_token(pc, CT_COMMA) && (pc->level == (open_paren->level + 1)))
       {
          split_before_chunk(chunk_get_next(pc));
+
          if (!is_past_width(pc))
          {
             return;
          }
       }
    }
-
    // Still past width, check for a assignments at parenthese level
    pc = open_paren;
+
    while ((pc = chunk_get_next(pc)) != start)
    {
       if (chunk_is_token(pc, CT_ASSIGN) && (pc->level == (open_paren->level + 1)))
       {
          split_before_chunk(chunk_get_next(pc));
+
          if (!is_past_width(pc))
          {
             return;
@@ -626,24 +642,27 @@ static void split_fcn_params_full(chunk_t *start)
    // Find the opening function parenthesis
    chunk_t *fpo = start;
    LOG_FMT(LSPLIT, "  %s(%d): Find the opening function parenthesis\n", __func__, __LINE__);
+
    while ((fpo = chunk_get_prev(fpo)) != nullptr)
    {
       LOG_FMT(LSPLIT, "%s(%d): %s, orig_col is %zu, level is %zu\n",
               __func__, __LINE__, fpo->text(), fpo->orig_col, fpo->level);
+
       if (chunk_is_token(fpo, CT_FPAREN_OPEN) && (fpo->level == start->level - 1))
       {
          break;  // opening parenthesis found. Issue #1020
       }
    }
-
    // Now break after every comma
    chunk_t *pc = fpo;
+
    while ((pc = chunk_get_next_ncnl(pc)) != nullptr)
    {
       if (pc->level <= fpo->level)
       {
          break;
       }
+
       if ((pc->level == (fpo->level + 1)) && chunk_is_token(pc, CT_COMMA))
       {
          split_before_chunk(chunk_get_next(pc));
@@ -657,10 +676,12 @@ static void split_fcn_params(chunk_t *start)
    LOG_FUNC_ENTRY();
    LOG_FMT(LSPLIT, "%s(%d): '%s'\n", __func__, __LINE__, start->text());
    chunk_t *fpo = start;
+
    if (!chunk_is_token(start, CT_FPAREN_OPEN))
    {
       // Find the opening function parenthesis
       LOG_FMT(LSPLIT, "%s(%d): Find the opening function parenthesis\n", __func__, __LINE__);
+
       while (  ((fpo = chunk_get_prev(fpo)) != nullptr)
             && chunk_is_not_token(fpo, CT_FPAREN_OPEN))
       {
@@ -669,7 +690,6 @@ static void split_fcn_params(chunk_t *start)
                  __func__, __LINE__, fpo->text(), fpo->orig_col, fpo->level);
       }
    }
-
    chunk_t *pc     = chunk_get_next_ncnl(fpo);
    size_t  min_col = pc->column;
 
@@ -679,10 +699,12 @@ static void split_fcn_params(chunk_t *start)
    int cur_width = 0;
    int last_col  = -1;
    LOG_FMT(LSPLIT, "%s(%d):look forward until CT_COMMA or CT_FPAREN_CLOSE\n", __func__, __LINE__);
+
    while (pc != nullptr)
    {
       LOG_FMT(LSPLIT, "%s(%d): pc->text() '%s', type is %s\n",
               __func__, __LINE__, pc->text(), get_token_name(pc->type));
+
       if (chunk_is_newline(pc))
       {
          cur_width = 0;
@@ -701,11 +723,20 @@ static void split_fcn_params(chunk_t *start)
 
          LOG_FMT(LSPLIT, "%s(%d): last_col is %d\n",
                  __func__, __LINE__, last_col);
+
          if (chunk_is_token(pc, CT_COMMA) || chunk_is_token(pc, CT_FPAREN_CLOSE))
          {
+            if (cur_width == 0)
+            {
+               fprintf(stderr, "%s(%d): cur_width is ZERO, cannot be decremented, at line %zu, column %zu\n",
+                       __func__, __LINE__, pc->orig_line, pc->orig_col);
+               log_flush(true);
+               exit(EX_SOFTWARE);
+            }
             cur_width--;
             LOG_FMT(LSPLIT, "%s(%d): cur_width is %d\n",
                     __func__, __LINE__, cur_width);
+
             if (  ((last_col - 1) > static_cast<int>(options::code_width()))
                || chunk_is_token(pc, CT_FPAREN_CLOSE))
             {
@@ -715,14 +746,15 @@ static void split_fcn_params(chunk_t *start)
       }
       pc = chunk_get_next(pc);
    }
-
    // back up until the prev is a comma
    chunk_t *prev = pc;
    LOG_FMT(LSPLIT, "  %s(%d): back up until the prev is a comma\n", __func__, __LINE__);
+
    while ((prev = chunk_get_prev(prev)) != nullptr)
    {
       LOG_FMT(LSPLIT, "%s(%d): pc '%s', pc->level is %zu, prev '%s', prev->type is %s\n",
               __func__, __LINE__, pc->text(), pc->level, prev->text(), get_token_name(prev->type));
+
       if (chunk_is_newline(prev) || chunk_is_token(prev, CT_COMMA))
       {
          LOG_FMT(LSPLIT, "%s(%d): found at %zu\n",
@@ -734,14 +766,17 @@ static void split_fcn_params(chunk_t *start)
       last_col -= pc->len();
       LOG_FMT(LSPLIT, "%s(%d): last_col is %d\n",
               __func__, __LINE__, last_col);
+
       if (chunk_is_token(prev, CT_FPAREN_OPEN))
       {
          pc = chunk_get_next(prev);
+
          if (!options::indent_paren_nl())
          {
             min_col = pc->brace_level * options::indent_columns() + 1;
             LOG_FMT(LSPLIT, "%s(%d): min_col is %zu\n",
                     __func__, __LINE__, min_col);
+
             if (options::indent_continue() == 0)
             {
                min_col += options::indent_columns();
@@ -761,6 +796,7 @@ static void split_fcn_params(chunk_t *start)
          }
       }
    }
+
    if (prev != nullptr && !chunk_is_newline(prev))
    {
       LOG_FMT(LSPLIT, "%s(%d): -- ended on %s --\n",
@@ -783,9 +819,11 @@ static void split_template(chunk_t *start)
 
    // back up until the prev is a comma
    chunk_t *prev = start;
+
    while ((prev = chunk_get_prev(prev)) != nullptr)
    {
       LOG_FMT(LSPLIT, "  %s(%d): prev '%s'\n", __func__, __LINE__, prev->text());
+
       if (chunk_is_newline(prev) || chunk_is_token(prev, CT_COMMA))
       {
          break;
@@ -799,6 +837,7 @@ static void split_template(chunk_t *start)
       chunk_t *pc = chunk_get_next(prev);
       newline_add_before(pc);
       size_t  min_col = 1;
+
       if (options::indent_continue() == 0)
       {
          min_col += options::indent_columns();

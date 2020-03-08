@@ -94,6 +94,13 @@ std::unordered_map<std::string, GenericOption *> option_map;
 
 
 //-----------------------------------------------------------------------------
+constexpr int option_level(int major, int minor, int patch = 0)
+{
+   return((major << 20) | (minor << 10) | (patch << 0));
+}
+
+
+//-----------------------------------------------------------------------------
 void log_config()
 {
    // Print the name of the configuration file only once
@@ -128,12 +135,12 @@ std::string to_lower(const char *in, std::string::size_type size = 0)
    {
       out.reserve(size);
    }
+
    while (*in)
    {
       out += static_cast<char>(std::tolower(*in));
       ++in;
    }
-
    return(out);
 }
 
@@ -149,6 +156,13 @@ std::string to_lower(const std::string &in)
 bool is_arg_sep(int ch)
 {
    return(isspace(ch) || ch == ',' || ch == '=');
+}
+
+
+//-----------------------------------------------------------------------------
+bool is_varg_sep(int ch)
+{
+   return(ch == '.');
 }
 
 
@@ -179,6 +193,7 @@ std::vector<std::string> split_args(std::string in, const char *filename,
       if (const auto *quote = strchr("\'\"`", in[n]))
       {
          const auto start = ++n;
+
          for ((void)n; in[n] != *quote; ++n)
          {
             if (n < k && in[n] == '\\')
@@ -186,6 +201,7 @@ std::vector<std::string> split_args(std::string in, const char *filename,
                in.erase(n, 1);
                --k;
             }
+
             if (n >= k)
             {
                OptionWarning w{ filename };
@@ -193,7 +209,9 @@ std::vector<std::string> split_args(std::string in, const char *filename,
                return{};
             }
          }
+
          out.push_back(in.substr(start, n - start));
+
          if (++n < k && !is_sep(in[n]))
          {
             OptionWarning w{ filename };
@@ -202,9 +220,9 @@ std::vector<std::string> split_args(std::string in, const char *filename,
          }
          continue;
       }
-
       // Extract anything else
       const auto start = n;
+
       for ((void)n; n < k && !is_sep(in[n]); ++n)
       {
          if (in[n] == '\\')
@@ -212,6 +230,7 @@ std::vector<std::string> split_args(std::string in, const char *filename,
             in.erase(n, 1);
             --k;
          }
+
          if (n >= k)
          {
             OptionWarning w{ filename };
@@ -219,9 +238,9 @@ std::vector<std::string> split_args(std::string in, const char *filename,
             return{};
          }
       }
+
       out.push_back(in.substr(start, n - start));
    }
-
    return(out);
 } // split_args
 
@@ -276,6 +295,24 @@ void print_description(FILE *pfile, std::string description,
    }
 }
 
+
+//-----------------------------------------------------------------------------
+bool process_option_line_compat_0_68(const std::string              &cmd,
+                                     const std::vector<std::string> &args,
+                                     const char                     *filename)
+{
+   if (cmd == "sp_cpp_lambda_paren")
+   {
+      OptionWarning w{ filename, OptionWarning::MINOR };
+      w("option '%s' is deprecated; use '%s' instead",
+        cmd.c_str(), options::sp_cpp_lambda_square_paren.name());
+
+      UNUSED(options::sp_cpp_lambda_square_paren.read(args[1].c_str()));
+      return(true);
+   }
+   return(false);
+} // process_option_line_compat_0_68
+
 } // namespace
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -284,9 +321,13 @@ void print_description(FILE *pfile, std::string description,
 
 
 //-----------------------------------------------------------------------------
-OptionWarning::OptionWarning(const char *filename)
+OptionWarning::OptionWarning(const char *filename, Severity severity)
 {
-   ++cpd.error_count;
+   if (severity != MINOR)
+   {
+      ++cpd.error_count;
+   }
+
    if (cpd.line_number != 0)
    {
       fprintf(stderr, "%s:%u: ", filename, cpd.line_number);
@@ -299,9 +340,12 @@ OptionWarning::OptionWarning(const char *filename)
 
 
 //-----------------------------------------------------------------------------
-OptionWarning::OptionWarning(const GenericOption *opt)
+OptionWarning::OptionWarning(const GenericOption *opt, Severity severity)
 {
-   ++cpd.error_count;
+   if (severity != MINOR)
+   {
+      ++cpd.error_count;
+   }
    fprintf(stderr, "Option<%s>: at %s:%d: ", to_string(opt->type()),
            cpd.filename.c_str(), cpd.line_number);
 }
@@ -340,16 +384,18 @@ void GenericOption::warnUnexpectedValue(const char *actual) const
    else
    {
       w("Expected one of ");
+
       while (*values)
       {
          w("'%s'", *values);
+
          if (*(++values))
          {
             w(", ");
          }
       }
    }
-   w("for '%s'; got '%s'", name(), actual);
+   w(", for '%s'; got '%s'", name(), actual);
 }
 
 
@@ -381,12 +427,10 @@ bool read_enum(const char *in, Option<T> &out)
          out.warnIncompatibleReference(opt);
          return(false);
       }
-
       auto &topt = *static_cast<const Option<T> *>(opt);
       out.m_val = topt();
       return(true);
    }
-
    out.warnUnexpectedValue(in);
    return(false);
 }
@@ -406,8 +450,8 @@ bool read_number(const char *in, Option<T> &out)
       out.m_val = static_cast<T>(val);
       return(true);
    }
-
    bool invert = false;
+
    if (strchr("-", in[0]))
    {
       invert = true;
@@ -422,6 +466,7 @@ bool read_number(const char *in, Option<T> &out)
                  to_string(opt->type()), opt->name());
 
       long tval;
+
       if (opt->type() == OT_NUM)
       {
          auto &sopt = *static_cast<const Option<signed> *>(opt);
@@ -437,8 +482,8 @@ bool read_number(const char *in, Option<T> &out)
          out.warnIncompatibleReference(opt);
          return(false);
       }
-
       const auto rval = (invert ? -tval : tval);
+
       if (out.validate(rval))
       {
          out.m_val = static_cast<T>(rval);
@@ -446,10 +491,17 @@ bool read_number(const char *in, Option<T> &out)
       }
       return(false);
    }
-
    out.warnUnexpectedValue(in);
    return(false);
 } // read_number
+
+
+//-----------------------------------------------------------------------------
+template<typename T>
+void Option<T>::reset()
+{
+   m_val = m_default;
+}
 
 
 //-----------------------------------------------------------------------------
@@ -511,8 +563,8 @@ bool Option<bool>::read(const char *in)
    {
       return(true);
    }
-
    bool invert = false;
+
    if (strchr("~!-", in[0]))
    {
       invert = true;
@@ -526,12 +578,10 @@ bool Option<bool>::read(const char *in)
          warnIncompatibleReference(opt);
          return(false);
       }
-
       auto &bopt = *static_cast<const Option<bool> *>(opt);
       m_val = (invert ? !bopt() : bopt());
       return(true);
    }
-
    warnUnexpectedValue(in);
    return(false);
 }
@@ -781,7 +831,8 @@ size_t get_option_count()
 
 
 //-----------------------------------------------------------------------------
-void process_option_line(const std::string &config_line, const char *filename)
+void process_option_line(const std::string &config_line, const char *filename,
+                         int &compat_level)
 {
    // Split line into arguments, and punt if no arguments are present
    auto args = split_args(config_line, filename, is_arg_sep);
@@ -790,9 +841,9 @@ void process_option_line(const std::string &config_line, const char *filename)
    {
       return;
    }
-
    // Check for necessary arguments
    const auto &cmd = to_lower(args.front());
+
    if (cmd == "set" || cmd == "file_ext")
    {
       if (args.size() < 3)
@@ -834,15 +885,18 @@ void process_option_line(const std::string &config_line, const char *filename)
    else if (cmd == "set")
    {
       const auto token = find_token_name(args[1].c_str());
+
       if (token != CT_NONE)
       {
          LOG_FMT(LNOTE, "%s:%d set '%s':",
                  filename, cpd.line_number, args[1].c_str());
+
          for (size_t i = 2; i < args.size(); ++i)
          {
             LOG_FMT(LNOTE, " '%s'", args[i].c_str());
             add_keyword(args[i], token);
          }
+
          LOG_FMT(LNOTE, "\n");
       }
       else
@@ -868,23 +922,24 @@ void process_option_line(const std::string &config_line, const char *filename)
          unc_text ut = std::string{ filename };
          ut.resize(static_cast<unsigned>(path_dirname_len(filename)));
          ut.append(include_path);
-         UNUSED(load_option_file(ut.c_str()));
+         UNUSED(load_option_file(ut.c_str(), compat_level));
       }
       else
       {
          // include is an absolute path
-         UNUSED(load_option_file(include_path.c_str()));
+         UNUSED(load_option_file(include_path.c_str(), compat_level));
       }
-
       cpd.line_number = this_line_number;
    }
 #endif
    else if (cmd == "file_ext")
    {
       auto *const lang_arg = args[1].c_str();
+
       for (size_t i = 2; i < args.size(); ++i)
       {
          auto *const lang_name = extension_add(args[i].c_str(), lang_arg);
+
          if (lang_name)
          {
             LOG_FMT(LNOTE, "%s:%d file_ext '%s' => '%s'\n",
@@ -898,14 +953,43 @@ void process_option_line(const std::string &config_line, const char *filename)
          }
       }
    }
+   else if (cmd == "using")
+   {
+      auto vargs = split_args(args[1], filename, is_varg_sep);
+
+      if (vargs.size() == 2)
+      {
+         compat_level = option_level(std::stoi(vargs[0]), std::stoi(vargs[1]));
+      }
+      else if (vargs.size() == 3)
+      {
+         compat_level = option_level(std::stoi(vargs[0]),
+                                     std::stoi(vargs[1]),
+                                     std::stoi(vargs[2]));
+      }
+      else
+      {
+         OptionWarning w{ filename };
+         w("%s requires a version number in the form MAJOR.MINOR[.PATCH]",
+           cmd.c_str());
+      }
+   }
    else
    {
       // Must be a regular option = value
+      if (compat_level < option_level(0, 69))
+      {
+         if (process_option_line_compat_0_68(cmd, args, filename))
+         {
+            return;
+         }
+      }
       const auto oi = option_map.find(cmd);
+
       if (oi == option_map.end())
       {
          OptionWarning w{ filename };
-         w("unknown symbol '%s'", args[0].c_str());
+         w("unknown option '%s'", args[0].c_str());
       }
       else
       {
@@ -916,7 +1000,7 @@ void process_option_line(const std::string &config_line, const char *filename)
 
 
 //-----------------------------------------------------------------------------
-bool load_option_file(const char *filename)
+bool load_option_file(const char *filename, int compat_level)
 {
    cpd.line_number = 0;
 
@@ -930,6 +1014,7 @@ bool load_option_file(const char *filename)
 
    std::ifstream in;
    in.open(filename, std::ifstream::in);
+
    if (!in.good())
    {
       OptionWarning w{ filename };
@@ -937,13 +1022,13 @@ bool load_option_file(const char *filename)
         strerror(errno), errno);
       return(false);
    }
-
    // Read in the file line by line
    std::string line;
+
    while (std::getline(in, line))
    {
       ++cpd.line_number;
-      process_option_line(line, filename);
+      process_option_line(line, filename, compat_level);
    }
    return(true);
 }
@@ -990,7 +1075,6 @@ void save_option_file(FILE *pfile, bool with_doc, bool minimal)
          {
             continue;
          }
-
          //....................................................................
 
          if (with_doc)
@@ -1004,11 +1088,11 @@ void save_option_file(FILE *pfile, bool with_doc, bool minimal)
                print_description(pfile, og.description, eol_marker);
                fprintf(pfile, "#%s", eol_marker);
             }
-
             fprintf(pfile, "%s", eol_marker);
             print_description(pfile, option->description(), eol_marker);
 
             const auto ds = option->defaultStr();
+
             if (!ds.empty())
             {
                fprintf(pfile, "#%s# Default: %s%s",
@@ -1031,10 +1115,12 @@ void save_option_file(FILE *pfile, bool with_doc, bool minimal)
          {
             fprintf(pfile, "%s", val.c_str());
          }
+
          if (with_doc)
          {
             const int val_len = static_cast<int>(val.length());
             fprintf(pfile, "%*.s # ", 8 - val_len, " ");
+
             for (auto pv = option->possibleValues(); *pv; ++pv)
             {
                fprintf(pfile, "%s%s", *pv, pv[1] ? "/" : "");
@@ -1048,7 +1134,6 @@ void save_option_file(FILE *pfile, bool with_doc, bool minimal)
    {
       fprintf(pfile, "%s", DOC_TEXT_END);
    }
-
    print_keywords(pfile);    // Print custom keywords
    print_extensions(pfile);  // Print custom file extensions
 

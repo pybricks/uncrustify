@@ -11,12 +11,12 @@
 
 //#define DEVELOP_ONLY
 #ifdef DEVELOP_ONLY
+#include "chunk_list.h"
 #include "prototypes.h"
 #include "uncrustify_types.h"
-#include "chunk_list.h"
 
 
-void prot_the_line(int theLine, unsigned int actual_line);
+void prot_the_line(const char *func_name, int theLine, unsigned int actual_line, size_t partNumber);
 
 
 void prot_the_source(int theLine);

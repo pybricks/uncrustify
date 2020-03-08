@@ -11,7 +11,7 @@
 A source code beautifier for C, C++, C#, ObjectiveC, D, Java, Pawn and VALA
 
 ## Features
-* highly configurable - 671 configurable options as of version 0.69.0
+* Highly configurable - 710 configurable options as of version 0.70.1
 - <details><summary>add/remove spaces</summary>
 
   - `sp_before_sparen`: _Add or remove space before '(' of 'if', 'for', 'switch', 'while', etc._
@@ -176,7 +176,7 @@ Expected results have the following naming convention: `testNr-testConfigFileNam
 Optionally a `!` can follow the `testNr` to enable a custom rerun
 configuration.
 Rerun configurations need to be named like this:
-`testConfigFileName`(without extension)+`.rerun`+`.exension`
+`testConfigFileName`(without extension)+`.rerun`+`.extension`
 
 Also, optionally a language for the input can be provided with `lang`.
 
@@ -193,6 +193,87 @@ need to be manually updated. This often happens when options are
 added, removed or altered. Keep in mind that the version string line
 (example: `# Uncrustify-0.69.0_f`) of outputs from commands like
 `--show-config` should be replaced with a blank line.
+
+### Debugging
+
+The first method is to use uncrustify itself to get debug informations.
+Using:
+```.txt
+   uncrustify -c myExample.cfg -f myExample.cpp -p myExample.p -L A 2>myExample.A
+```
+you get two files for the first informations.
+The p-file gives you details of the parsing process and indentation.
+```.txt
+# Line                Tag              Parent          Columns Br/Lvl/pp     Flag   Nl  Text
+#   1>              CLASS[               NONE][  1/  1/  6/  0][0/0/0][  10070000][0-0] class
+#   1>               TYPE[              CLASS][  7/  7/ 14/  1][0/0/0][  10000000][0-0]       Capteur
+#   1>         BRACE_OPEN[              CLASS][ 15/ 15/ 16/  1][0/0/0][ 100000400][0-0]               {
+```
+
+The A-file gives you many details about the run itself, where the process is running thru,
+which values have the most important variables.
+```.txt
+tokenize(2351): orig_line is 1, orig_col is 1, text() 'class', type is CLASS, orig_col_end is 6
+tokenize(2351): orig_line is 1, orig_col is 7, text() 'Capteur', type is WORD, orig_col_end is 14
+tokenize(2351): orig_line is 1, orig_col is 15, text() '{', type is BRACE_OPEN, orig_col_end is 16
+```
+
+It might be usefull to add some code lines to see where something is happening.
+Use the package `unc_tools`.
+Remove the comment at line:
+```.cpp
+#define DEVELOP_ONLY
+```
+Import the package:
+```.cpp
+#include "unc_tools.h"
+```
+Add at some places the line:
+```.cpp
+prot_the_line(__LINE__, 6, 0);
+```
+Compile again with DEBUG option.
+
+
+
+### How to add an option
+
+If you need a new option, there are a few steps to follow.
+Take as example the option `sp_trailing_ret_t`
+
+First define the option:
+- Insert the code below to the file src/options.h
+_NOTE:
+This file is processed by make_options.py, and must conform to a particular
+format. Option groups are marked by '//begin ' (in upper case; this example
+is lower case to prevent being considered a region marker for code folding)
+followed by the group description. Options consist of two lines of
+declaration preceded by one or more lines of C++ comments. The comments form
+the option description and are taken verbatim, aside from stripping the
+leading '// '. Only comments immediately preceding an option declaration,
+with no blank lines, are taken as part of the description, so a blank line
+may be used to separate notations from a description.
+An option declaration is 'extern TYPE\nNAME;', optionally followed by
+' // = VALUE' if the option has a default value that is different from the
+default-constructed value type of the option. The 'VALUE' must be valid C++
+code, and is taken verbatim as an argument when creating the option's
+instantiation. Note also that the line break, as shown, is required.
+_
+```.cpp
+// Add or remove space around trailing return operator '->'.
+extern Option<iarf_e>
+sp_trailing_ret_t;
+```
+- Insert the code below to the file src/space.cpp
+```.cpp
+   if (chunk_is_token(first, CT_TRAILING_RET_T))
+   {
+      // Add or remove space around trailing return operator '->'.
+      log_rule("sp_trailing_ret_t");
+      return(options::sp_trailing_ret_t());
+   }
+```
+
 
 ### Portability
 
@@ -229,7 +310,7 @@ If flag `-f` is used without flag `-o` the output will be send to `stdout`.
 
 Alternatively multiple or single files that should be processed can be
 specified at the command end without flags.
-If the flag `--no-backup` is missing, every file saved with the initial
+If the flag `--no-backup` is missing, every file is saved with the initial
 name and an additional suffix (can be changed with --suffix).
 
 For more options descriptions call:
@@ -278,7 +359,7 @@ To ease the process a bit, some 3rd party tools are available:
   cross-platform graphical configuration file editor for many code
   beautifiers, including Uncrustify.
 - [uncrustify_config](https://github.com/CDanU/uncrustify_config) - A web
-  configuration tool based on Uncrustifys emscripten interface.
+  configuration tool based on Uncrustify's emscripten interface.
 - [UncrustifyX](https://github.com/ryanmaxwell/UncrustifyX) - Uncrustify
   utility and documentation browser for Mac OS X
 
@@ -290,4 +371,4 @@ as uncrustify exits.
 
 You can open the command prompt (which is an interactive terminal
 window that allows you to run commands without it closing as soon as
-they exit) and run uncristify.exe there.
+they exit) and run uncrustify.exe there.

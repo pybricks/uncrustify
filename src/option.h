@@ -22,8 +22,8 @@
 
 #include "enum_flags.h"
 
-#include <vector>
 #include <string>
+#include <vector>
 
 #include <cassert>
 
@@ -88,16 +88,16 @@ constexpr auto line_end_styles = static_cast<size_t>(line_end_e::AUTO);
 /// Token position - these are bit fields
 enum class token_pos_e // <TP>
 {
-   IGNORE      = 0,  //! don't change it
-   BREAK       = 1,  //! add a newline before or after the if not present
-   FORCE       = 2,  //! force a newline on one side and not the other
-   LEAD        = 4,  //! at the start of a line or leading if wrapped line
-   TRAIL       = 8,  //! at the end of a line or trailing if wrapped line
-   JOIN        = 16, //! remove newlines on both sides
-   LEAD_BREAK  = (LEAD | BREAK),
-   LEAD_FORCE  = (LEAD | FORCE),
-   TRAIL_BREAK = (TRAIL | BREAK),
-   TRAIL_FORCE = (TRAIL | FORCE),
+   IGNORE      = 0,               //! don't change it
+   BREAK       = 1,               //! add a newline before or after the if not present
+   FORCE       = 2,               //! force a newline on one side and not the other
+   LEAD        = 4,               //! at the start of a line or leading if wrapped line
+   TRAIL       = 8,               //! at the end of a line or trailing if wrapped line
+   JOIN        = 16,              //! remove newlines on both sides
+   LEAD_BREAK  = (LEAD | BREAK),  //  5
+   LEAD_FORCE  = (LEAD | FORCE),  //  6
+   TRAIL_BREAK = (TRAIL | BREAK), //  9
+   TRAIL_FORCE = (TRAIL | FORCE), // 10
 };
 
 UNC_DECLARE_FLAGS(token_pos_flags_t, token_pos_e);
@@ -125,6 +125,7 @@ public:
 
    virtual bool isDefault() const = 0;
 
+   virtual void reset() = 0;
    virtual bool read(const char *s) = 0;
    virtual std::string str() const = 0;
 
@@ -144,8 +145,17 @@ protected:
 class OptionWarning
 {
 public:
-   OptionWarning(const char *filename);
-   OptionWarning(const GenericOption *);
+   enum class /* UNC_NO_META */ Severity
+   {
+      OS_CRITICAL,
+      OS_MINOR,
+   };
+
+   constexpr static auto CRITICAL = Severity::OS_CRITICAL;
+   constexpr static auto MINOR    = Severity::OS_MINOR;
+
+   OptionWarning(const char *filename, Severity = CRITICAL);
+   OptionWarning(const GenericOption *, Severity = CRITICAL);
    OptionWarning(const OptionWarning &) = delete;
    ~OptionWarning();
 
@@ -172,6 +182,10 @@ public:
    std::string defaultStr() const override;
 
    bool isDefault() const override { return(m_val == m_default); }
+
+   //! resets option to its default value
+   //- currently only used by the emscripten interface
+   virtual void reset() override;
 
    bool read(const char *s) override;
    std::string str() const override;
@@ -215,6 +229,7 @@ protected:
            val, this->name(), static_cast<long>(min));
          return(false);
       }
+
       if (val > static_cast<long>(max))
       {
          OptionWarning w{ this };
@@ -315,11 +330,12 @@ size_t get_option_count();
  * @param config_line  single line string that will be processed
  * @param filename     for log messages, file from which the \p config_line
  *                     param was extracted
+ * @param compat_level version of Uncrustify with which to be compatible
  */
-void process_option_line(const std::string &config_line, const char *filename);
+void process_option_line(const std::string &config_line, const char *filename, int &compat_level);
 
 
-bool load_option_file(const char *filename);
+bool load_option_file(const char *filename, int compat_level = 0);
 
 
 /**

@@ -8,8 +8,8 @@
 #ifndef COMBINE_H_INCLUDED
 #define COMBINE_H_INCLUDED
 
-#include "uncrustify_types.h"
 #include "chunk_list.h"
+#include "uncrustify_types.h"
 
 
 /**
@@ -49,7 +49,7 @@ void mark_comments(void);
 void make_type(chunk_t *pc);
 
 
-void flag_series(chunk_t *start, chunk_t *end, UINT64 set_flags, UINT64 clr_flags = 0, scope_e nav = scope_e::ALL);
+void flag_series(chunk_t *start, chunk_t *end, pcf_flags_t set_flags, pcf_flags_t clr_flags = {}, scope_e nav = scope_e::ALL);
 
 
 /**

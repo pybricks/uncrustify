@@ -5,14 +5,18 @@
  * @author  Ben Gardner
  * @license GPL v2+
  */
-#include "uncrustify_types.h"
-#include "prototypes.h"
-#include "chunk_list.h"
-#include "uncrustify.h"
-#include <cstdio>
-#include <cstring>
-#include <cstdlib>
+
 #include "frame_list.h"
+
+#include "chunk_list.h"
+#include "error_types.h"
+#include "prototypes.h"
+#include "uncrustify.h"
+#include "uncrustify_types.h"
+
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 
 
 static void fl_log_frms(log_sev_t logsev, const char *txt, const ParseFrame &frm);
@@ -52,11 +56,13 @@ static void fl_log(log_sev_t logsev, const ParseFrame &frm)
            get_token_name(frm.in_ifdef), frm.brace_level, frm.level, frm.size() - 1);
 
    LOG_FMT(logsev, " *");
+
    for (size_t idx = 1; idx < frm.size(); idx++)
    {
       LOG_FMT(logsev, " [%s-%u]", get_token_name(frm.at(idx).type),
               static_cast<unsigned int>(frm.at(idx).stage));
    }
+
    LOG_FMT(logsev, "\n");
 }
 
@@ -85,6 +91,7 @@ static void fl_log_all(log_sev_t logsev)
 
       fl_log(logsev, cpd.frames.at(idx));
    }
+
    LOG_FMT(logsev, "##=-\n");
 }
 
@@ -146,8 +153,8 @@ int fl_check(ParseFrame &frm, chunk_t *pc)
    {
       return(cpd.pp_level);
    }
-
    chunk_t *next = chunk_get_next(pc);
+
    if (next == nullptr)
    {
       return(cpd.pp_level);
@@ -160,7 +167,6 @@ int fl_check(ParseFrame &frm, chunk_t *pc)
               get_token_name(next->type));
       set_chunk_parent(pc, next->type);
    }
-
    LOG_FMT(LPFCHK, "%s(%d): %zu] %s\n",
            __func__, __LINE__, pc->orig_line, get_token_name(pc->parent_type));
    fl_log_frms(LPFCHK, "TOP", frm);
@@ -171,7 +177,8 @@ int fl_check(ParseFrame &frm, chunk_t *pc)
    const size_t    b4_cnt   = cpd.frames.size();
 
    const char      *txt = nullptr;
-   if (pc->flags & PCF_IN_PREPROC)
+
+   if (pc->flags.test(PCF_IN_PREPROC))
    {
       LOG_FMT(LPF, " <In> ");
       fl_log(LPF, frm);
@@ -186,6 +193,13 @@ int fl_check(ParseFrame &frm, chunk_t *pc)
       }
       else if (pc->parent_type == CT_PP_ELSE)
       {
+         if (pp_level == 0)
+         {
+            fprintf(stderr, "%s(%d): pp_level is ZERO, cannot be decremented, at line %zu, column %zu\n",
+                    __func__, __LINE__, pc->orig_line, pc->orig_col);
+            log_flush(true);
+            exit(EX_SOFTWARE);
+         }
          pp_level--;
 
          /*
@@ -212,7 +226,23 @@ int fl_check(ParseFrame &frm, chunk_t *pc)
           * we may have [...] [base] [if]-[else] or [...] [base]-[if].
           * Throw out the [else].
           */
+         if (cpd.pp_level == 0)
+         {
+            // cpd.pp_level is ZERO, cannot be decremented.
+            fprintf(stderr, "%s(%d): #endif found, at line %zu, column %zu, without corresponding #if\n",
+                    __func__, __LINE__, pc->orig_line, pc->orig_col);
+            log_flush(true);
+            exit(EX_SOFTWARE);
+         }
          cpd.pp_level--;
+
+         if (pp_level == 0)
+         {
+            fprintf(stderr, "%s(%d): pp_level is ZERO, cannot be decremented, at line %zu, column %zu\n",
+                    __func__, __LINE__, pc->orig_line, pc->orig_col);
+            log_flush(true);
+            exit(EX_SOFTWARE);
+         }
          pp_level--;
 
          if (frm.in_ifdef == CT_PP_ELSE)
@@ -262,7 +292,6 @@ int fl_check(ParseFrame &frm, chunk_t *pc)
       LOG_FMT(LPF, " <Out>");
       fl_log(LPF, frm);
    }
-
    fl_log_frms(LPFCHK, "END", frm);
 
    return(pp_level);

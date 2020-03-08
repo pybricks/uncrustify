@@ -5,11 +5,12 @@
  * @author  Ben Gardner
  * @license GPL v2+
  */
+
 #ifndef NEWLINES_H_INCLUDED
 #define NEWLINES_H_INCLUDED
 
-#include "uncrustify_types.h"
 #include "chunk_list.h"
+#include "uncrustify_types.h"
 
 
 /**
@@ -18,9 +19,16 @@
  */
 void newlines_remove_newlines(void);
 
+/** Step through all chunks, altering newlines inside parens of if/for/while/do as needed.
+ * Handles the style options: nl_multi_line_sparen_open, nl_multi_line_sparen_close, nl_before_if_closing_paren
+ */
+void newlines_sparens();
 
 //! Step through all chunks.
 void newlines_cleanup_braces(bool first);
+
+
+void newlines_cleanup_angles();
 
 
 //! Handle insertion/removal of blank lines before if/for/while/do and functions

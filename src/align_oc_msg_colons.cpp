@@ -54,6 +54,7 @@ void align_oc_msg_colon(chunk_t *so)
          has_colon = true;
          cas.Add(pc);
          chunk_t *tmp = chunk_get_prev(pc);
+
          if (  tmp != nullptr
             && (chunk_is_token(tmp, CT_OC_MSG_FUNC) || chunk_is_token(tmp, CT_OC_MSG_NAME)))
          {
@@ -64,7 +65,6 @@ void align_oc_msg_colon(chunk_t *so)
       }
       pc = chunk_get_next(pc, scope_e::PREPROC);
    }
-
    nas.m_skip_first = !options::align_oc_msg_colon_first();
    cas.m_skip_first = !options::align_oc_msg_colon_first();
 
@@ -74,20 +74,25 @@ void align_oc_msg_colon(chunk_t *so)
    chunk_t *longest  = nullptr;
 
    size_t  len = nas.m_aligned.Len();
+
    for (size_t idx = 0; idx < len; idx++)
    {
       chunk_t *tmp = nas.m_aligned.GetChunk(idx);
+
       if (tmp != nullptr)
       {
          size_t tlen = tmp->str.size();
+
          if (tlen > mlen)
          {
             mlen = tlen;
+
             if (idx != 0)
             {
                longest = tmp;
             }
          }
+
          if (idx == 0)
          {
             first_len = tlen + 1;
@@ -99,6 +104,7 @@ void align_oc_msg_colon(chunk_t *so)
    len = options::indent_oc_msg_colon();
    size_t len_diff    = mlen - first_len;
    size_t indent_size = options::indent_columns();
+
    // Align with first colon if possible by removing spaces
    if (  longest
       && options::indent_oc_msg_prioritize_first_colon()

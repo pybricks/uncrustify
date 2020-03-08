@@ -58,7 +58,8 @@ void temporary_iarf_option::restore()
 }
 
 //-----------------------------------------------------------------------------
-temporary_iarf_option for_qt_options[] = {
+temporary_iarf_option for_qt_options[] =
+{
    { &options::sp_inside_fparen           },
 // Issue #481
 // connect( timer,SIGNAL( timeout() ),this,SLOT( timeoutImage() ) );
@@ -90,10 +91,12 @@ void save_set_options_for_QT(size_t level)
    LOG_FMT(LGUY, "save values, level=%zu\n", level);
    // save the values
    QT_SIGNAL_SLOT_level = level;
+
    for (auto &opt : for_qt_options)
    {
       opt.save_and_override();
    }
+
    QT_SIGNAL_SLOT_found = true;
 }
 
@@ -106,10 +109,12 @@ void restore_options_for_QT(void)
    LOG_FMT(LGUY, "restore values\n");
    // restore the values we had before SIGNAL/SLOT
    QT_SIGNAL_SLOT_level = 0;
+
    for (auto &opt : for_qt_options)
    {
       opt.restore();
    }
+
    QT_SIGNAL_SLOT_found = false;
    restoreValues        = false;
 }

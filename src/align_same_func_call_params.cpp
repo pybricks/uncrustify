@@ -8,8 +8,9 @@
  */
 
 #include "align_same_func_call_params.h"
-#include "chunk_list.h"
+
 #include "align_stack.h"
+#include "chunk_list.h"
 
 using namespace uncrustify;
 
@@ -37,7 +38,6 @@ void align_same_func_call_params(void)
    {
       span = options::align_same_func_call_params_span();
    }
-
    thresh = options::align_same_func_call_params_thresh();
 
    fcn_as.Start(span, thresh);
@@ -52,6 +52,7 @@ void align_same_func_call_params(void)
             {
                as_v.NewLines(pc->nl_count);
             }
+
             fcn_as.NewLines(pc->nl_count);
          }
          else
@@ -63,22 +64,25 @@ void align_same_func_call_params(void)
 
                // Flush it all!
                fcn_as.Flush();
+
                for (auto &as_v : as)
                {
                   as_v.Flush();
                }
+
                align_root = nullptr;
             }
          }
          continue;
       }
-
       // Only align function calls that are right after a newline
       chunk_t *prev = chunk_get_prev(pc);
+
       while (  chunk_is_token(prev, CT_MEMBER)
             || chunk_is_token(prev, CT_DC_MEMBER))
       {
          chunk_t *tprev = chunk_get_prev(prev);
+
          if (!chunk_is_token(tprev, CT_TYPE))
          {
             prev = tprev;
@@ -86,6 +90,7 @@ void align_same_func_call_params(void)
          }
          prev = chunk_get_prev(tprev);
       }
+
       if (!chunk_is_newline(prev))
       {
          continue;
@@ -94,6 +99,7 @@ void align_same_func_call_params(void)
       align_fcn = prev;
       align_fcn_name.clear();
       LOG_FMT(LASFCP, "%s(%d): align_fnc_name '%s'\n", __func__, __LINE__, align_fcn_name.c_str());
+
       while (prev != pc)
       {
          LOG_FMT(LASFCP, "%s(%d): align_fnc_name '%s'\n", __func__, __LINE__, align_fcn_name.c_str());
@@ -110,6 +116,7 @@ void align_same_func_call_params(void)
               align_fcn_name.c_str());
 
       add_str = nullptr;
+
       if (align_root != nullptr)
       {
          // Issue # 1395
@@ -131,10 +138,12 @@ void align_same_func_call_params(void)
 
             // Flush it all!
             fcn_as.Flush();
+
             for (auto &as_v : as)
             {
                as_v.Flush();
             }
+
             align_root = nullptr;
          }
       }
@@ -159,10 +168,12 @@ void align_same_func_call_params(void)
          for (size_t idx = 0; idx < chunks.size(); idx++)
          {
             LOG_FMT(LASFCP, " [%s]", chunks[idx]->text());
+
             if (idx >= as.size())
             {
                as.resize(idx + 1);
                as[idx].Start(span, thresh);
+
                if (!options::align_number_right())
                {
                   if (  chunk_is_token(chunks[idx], CT_NUMBER_FP)
@@ -176,6 +187,7 @@ void align_same_func_call_params(void)
             }
             as[idx].Add(chunks[idx]);
          }
+
          LOG_FMT(LASFCP, "\n");
       }
    }
@@ -184,6 +196,7 @@ void align_same_func_call_params(void)
    {
       LOG_FMT(LASFCP, "  ++ Ended with %zu fcns\n", align_len);
       fcn_as.End();
+
       for (auto &as_v : as)
       {
          as_v.End();
@@ -200,6 +213,7 @@ void align_params(chunk_t *start, deque<chunk_t *> &chunks)
 
    bool    hit_comma = true;
    chunk_t *pc       = chunk_get_next_type(start, CT_FPAREN_OPEN, start->level);
+
    while ((pc = chunk_get_next(pc)) != nullptr)
    {
       if (  chunk_is_newline(pc)

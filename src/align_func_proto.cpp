@@ -8,8 +8,9 @@
  */
 
 #include "align_func_proto.h"
-#include "align_tools.h"
+
 #include "align_stack.h"
+#include "align_tools.h"
 
 using namespace uncrustify;
 
@@ -61,12 +62,13 @@ void align_func_proto(size_t span)
       }
       else if (  look_bro
               && chunk_is_token(pc, CT_BRACE_OPEN)
-              && (pc->flags & PCF_ONE_LINER))
+              && pc->flags.test(PCF_ONE_LINER))
       {
          as_br.Add(pc);
          look_bro = false;
       }
    }
+
    as.End();
    as_br.End();
 } // align_func_proto

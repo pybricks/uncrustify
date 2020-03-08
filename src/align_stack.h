@@ -119,9 +119,8 @@ protected:
    ChunkStack m_scratch;    //! used in ReAddSkipped()
 
    //! Calls Add on all the skipped items
-   void   ReAddSkipped();
+   void ReAddSkipped();
 };
 
 
 #endif /* ALIGN_STACK_H_INCLUDED */
-
