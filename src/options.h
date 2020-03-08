@@ -101,6 +101,18 @@ utf8_byte;
 extern Option<bool>
 utf8_force;
 
+// Add or remove space between 'do' and '{'.
+extern Option<iarf_e>
+sp_do_brace_open;
+
+// Add or remove space between '}' and 'while'.
+extern Option<iarf_e>
+sp_brace_close_while;
+
+// Add or remove space between 'while' and '('.
+extern Option<iarf_e>
+sp_while_paren_open;
+
 //END
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -127,9 +139,25 @@ sp_assign;
 extern Option<iarf_e>
 sp_cpp_lambda_assign;
 
-// Add or remove space after the capture specification in C++11 lambda.
+// Add or remove space after the capture specification of a C++11 lambda when
+// an argument list is present, as in '[] <here> (int x){ ... }'.
 extern Option<iarf_e>
-sp_cpp_lambda_paren;
+sp_cpp_lambda_square_paren;
+
+// Add or remove space after the capture specification of a C++11 lambda with
+// no argument list is present, as in '[] <here> { ... }'.
+extern Option<iarf_e>
+sp_cpp_lambda_square_brace;
+
+// Add or remove space after the argument list of a C++11 lambda, as in
+// '[](int x) <here> { ... }'.
+extern Option<iarf_e>
+sp_cpp_lambda_paren_brace;
+
+// Add or remove space between a lambda body and its call operator of an
+// immediately invoked lambda, as in '[]( ... ){ ... } <here> ( ... )'.
+extern Option<iarf_e>
+sp_cpp_lambda_fparen;
 
 // Add or remove space around assignment operator '=' in a prototype.
 //
@@ -224,7 +252,7 @@ extern Option<iarf_e>
 sp_before_ptr_star;
 
 // Add or remove space before pointer star '*' that isn't followed by a
-// variable name. If set to 'ignore', sp_before_ptr_star is used instead.
+// variable name. If set to ignore, sp_before_ptr_star is used instead.
 extern Option<iarf_e>
 sp_before_unnamed_ptr_star;
 
@@ -233,6 +261,8 @@ extern Option<iarf_e>
 sp_between_ptr_star;
 
 // Add or remove space after pointer star '*', if followed by a word.
+//
+// Overrides sp_type_func.
 extern Option<iarf_e>
 sp_after_ptr_star;
 
@@ -246,6 +276,8 @@ sp_after_ptr_star_qualifier;
 
 // Add or remove space after a pointer star '*', if followed by a function
 // prototype or function definition.
+//
+// Overrides sp_after_ptr_star and sp_type_func.
 extern Option<iarf_e>
 sp_after_ptr_star_func;
 
@@ -264,16 +296,20 @@ extern Option<iarf_e>
 sp_before_byref;
 
 // Add or remove space before a reference sign '&' that isn't followed by a
-// variable name. If set to 'ignore', sp_before_byref is used instead.
+// variable name. If set to ignore, sp_before_byref is used instead.
 extern Option<iarf_e>
 sp_before_unnamed_byref;
 
 // Add or remove space after reference sign '&', if followed by a word.
+//
+// Overrides sp_type_func.
 extern Option<iarf_e>
 sp_after_byref;
 
 // Add or remove space after a reference sign '&', if followed by a function
 // prototype or function definition.
+//
+// Overrides sp_after_byref and sp_type_func.
 extern Option<iarf_e>
 sp_after_byref_func;
 
@@ -316,7 +352,7 @@ sp_inside_angle_empty;
 extern Option<iarf_e>
 sp_angle_colon;
 
-// Add or remove space after '<>'.
+// Add or remove space after '>'.
 extern Option<iarf_e>
 sp_after_angle;
 
@@ -411,6 +447,14 @@ sp_after_semi_for_empty;
 // Add or remove space before '[' (except '[]').
 extern Option<iarf_e>
 sp_before_square;
+
+// Add or remove space before '[' for a variable definition.
+extern Option<iarf_e>
+sp_before_vardef_square; // = IARF_REMOVE
+
+// Add or remove space before '[' for asm block.
+extern Option<iarf_e>
+sp_before_square_asm_block;
 
 // Add or remove space before '[]'.
 extern Option<iarf_e>
@@ -584,6 +628,10 @@ sp_inside_braces;
 extern Option<iarf_e>
 sp_inside_braces_empty;
 
+// Add or remove space around trailing return operator '->'.
+extern Option<iarf_e>
+sp_trailing_return;
+
 // Add or remove space between return type and function name. A minimum of 1
 // is forced except for pointer return types.
 extern Option<iarf_e>
@@ -603,7 +651,11 @@ sp_func_proto_paren;
 extern Option<iarf_e>
 sp_func_proto_paren_empty;
 
-// Add or remove space between function name and '(' on function definition.
+// Add or remove space between function name and '(' with a typedef specifier.
+extern Option<iarf_e>
+sp_func_type_paren;
+
+// Add or remove space between alias name and '(' of a non-pointer function type typedef.
 extern Option<iarf_e>
 sp_func_def_paren;
 
@@ -613,6 +665,7 @@ extern Option<iarf_e>
 sp_func_def_paren_empty;
 
 // Add or remove space inside empty function '()'.
+// Overrides sp_after_angle unless use_sp_after_angle_always is set to true.
 extern Option<iarf_e>
 sp_inside_fparens;
 
@@ -654,7 +707,7 @@ extern Option<iarf_e>
 sp_func_call_paren;
 
 // Add or remove space between function name and '()' on function calls without
-// parameters. If set to 'ignore' (the default), sp_func_call_paren is used.
+// parameters. If set to ignore (the default), sp_func_call_paren is used.
 extern Option<iarf_e>
 sp_func_call_paren_empty;
 
@@ -1252,23 +1305,35 @@ indent_func_def_force_col1;
 extern Option<bool>
 indent_func_call_param;
 
-// Same as indent_func_call_param, but for function definitions.
+// Whether to indent continued function definition parameters one indent level,
+// rather than aligning parameters under the open parenthesis.
 extern Option<bool>
 indent_func_def_param;
 
-// Same as indent_func_call_param, but for function prototypes.
+// for function definitions, only if indent_func_def_param is false
+// Allows to align params when appropriate and indent them when not
+// behave as if it was true if paren position is more than this value
+// if paren position is more than the option value
+extern BoundedOption<unsigned, 0, 160>
+indent_func_def_param_paren_pos_threshold;
+
+// Whether to indent continued function call prototype one indent level,
+// rather than aligning parameters under the open parenthesis.
 extern Option<bool>
 indent_func_proto_param;
 
-// Same as indent_func_call_param, but for class declarations.
+// Whether to indent continued function call declaration one indent level,
+// rather than aligning parameters under the open parenthesis.
 extern Option<bool>
 indent_func_class_param;
 
-// Same as indent_func_call_param, but for class variable constructors.
+// Whether to indent continued class variable constructors one indent level,
+// rather than aligning parameters under the open parenthesis.
 extern Option<bool>
 indent_func_ctor_var_param;
 
-// Same as indent_func_call_param, but for template parameter lists.
+// Whether to indent continued template parameter list one indent level,
+// rather than aligning parameters under the open parenthesis.
 extern Option<bool>
 indent_template_param;
 
@@ -1286,6 +1351,15 @@ indent_func_const;
 // prototype.
 extern BoundedOption<unsigned, 0, 41>
 indent_func_throw;
+
+// How to indent within a macro followed by a brace on the same line
+// This allows reducing the indent in macros that have (for example)
+// `do { ... } while (0)` blocks bracketing them.
+//
+// true:  add an indent for the brace on the same line as the macro
+// false: do not add an indent for the brace on the same line as the macro
+extern Option<bool>
+indent_macro_brace; // = true
 
 // The number of spaces to indent a continued '->' or '.'.
 // Usually set to 0, 1, or indent_columns.
@@ -1309,6 +1383,10 @@ indent_relative_single_line_comments;
 // Spaces to indent 'case' from 'switch'. Usually 0 or indent_columns.
 extern BoundedOption<unsigned, 0, 16>
 indent_switch_case;
+
+// indent 'break' with 'case' from 'switch'.
+extern Option<bool>
+indent_switch_break_with_case; // = false
 
 // Whether to indent preprocessor statements inside of switch statements.
 extern Option<bool>
@@ -1339,8 +1417,11 @@ indent_col1_multi_string_literal;
 extern BoundedOption<signed, -16, 16>
 indent_label; // = 1
 
-// Same as indent_label, but for access specifiers that are followed by a
+// How to indent access specifiers that are followed by a
 // colon.
+//
+//  >0: Absolute column where 1 is the leftmost column
+// <=0: Subtract from brace indent
 extern BoundedOption<signed, -16, 16>
 indent_access_spec; // = 1
 
@@ -1544,6 +1625,7 @@ extern Option<bool>
 nl_cs_property_leave_one_liners;
 
 // Don't split one-line function definitions, as in 'int foo() { return 0; }'.
+// night modify nl_func_type_name
 extern Option<bool>
 nl_func_leave_one_liners;
 
@@ -1574,6 +1656,18 @@ nl_oc_mdef_brace;
 // (OC) Add or remove newline between Objective-C block signature and '{'.
 extern Option<iarf_e>
 nl_oc_block_brace;
+
+// (OC) Add or remove blank line before '@interface' statement.
+extern Option<iarf_e>
+nl_oc_before_interface;
+
+// (OC) Add or remove blank line before '@implementation' statement.
+extern Option<iarf_e>
+nl_oc_before_implementation;
+
+// (OC) Add or remove blank line before '@end' statement.
+extern Option<iarf_e>
+nl_oc_before_end;
 
 // (OC) Add or remove newline between '@interface' and '{'.
 extern Option<iarf_e>
@@ -1772,6 +1866,16 @@ nl_synchronized_brace;
 extern Option<bool>
 nl_multi_line_cond;
 
+// Add a newline after '(' if an if/for/while/switch condition spans multiple
+// lines
+extern Option<iarf_e>
+nl_multi_line_sparen_open;
+
+// Add a newline before ')' if an if/for/while/switch condition spans multiple
+// lines. Overrides nl_before_if_closing_paren if both are specified.
+extern Option<iarf_e>
+nl_multi_line_sparen_close;
+
 // Force a newline in a define after the macro name for multi-line defines.
 extern Option<bool>
 nl_multi_line_define;
@@ -1799,9 +1903,74 @@ nl_before_throw;
 extern Option<iarf_e>
 nl_namespace_brace;
 
-// Add or remove newline between 'template<>' and whatever follows.
+// Add or remove newline after 'template<...>' of a template class.
 extern Option<iarf_e>
 nl_template_class;
+
+// Add or remove newline after 'template<...>' of a template class declaration.
+//
+// Overrides nl_template_class.
+extern Option<iarf_e>
+nl_template_class_decl;
+
+// Add or remove newline after 'template<>' of a specialized class declaration.
+//
+// Overrides nl_template_class_decl.
+extern Option<iarf_e>
+nl_template_class_decl_special;
+
+// Add or remove newline after 'template<...>' of a template class definition.
+//
+// Overrides nl_template_class.
+extern Option<iarf_e>
+nl_template_class_def;
+
+// Add or remove newline after 'template<>' of a specialized class definition.
+//
+// Overrides nl_template_class_def.
+extern Option<iarf_e>
+nl_template_class_def_special;
+
+// Add or remove newline after 'template<...>' of a template function.
+extern Option<iarf_e>
+nl_template_func;
+
+// Add or remove newline after 'template<...>' of a template function
+// declaration.
+//
+// Overrides nl_template_func.
+extern Option<iarf_e>
+nl_template_func_decl;
+
+// Add or remove newline after 'template<>' of a specialized function
+// declaration.
+//
+// Overrides nl_template_func_decl.
+extern Option<iarf_e>
+nl_template_func_decl_special;
+
+// Add or remove newline after 'template<...>' of a template function
+// definition.
+//
+// Overrides nl_template_func.
+extern Option<iarf_e>
+nl_template_func_def;
+
+// Add or remove newline after 'template<>' of a specialized function
+// definition.
+//
+// Overrides nl_template_func_def.
+extern Option<iarf_e>
+nl_template_func_def_special;
+
+// Add or remove newline after 'template<...>' of a template variable.
+extern Option<iarf_e>
+nl_template_var;
+
+// Add or remove newline between 'template<...>' and 'using' of a templated
+// type alias.
+extern Option<iarf_e>
+nl_template_using;
 
 // Add or remove newline between 'class' and '{'.
 extern Option<iarf_e>
@@ -1825,6 +1994,7 @@ nl_enum_own_lines;
 
 // Add or remove newline between return type and function name in a function
 // definition.
+// might be modified by nl_func_leave_one_liners
 extern Option<iarf_e>
 nl_func_type_name;
 
@@ -1977,6 +2147,18 @@ nl_func_call_args_multi_line;
 // different lines.
 extern Option<bool>
 nl_func_call_end_multi_line;
+
+// Whether to add a newline after '<' of a template parameter list.
+extern Option<bool>
+nl_template_start;
+
+// Whether to add a newline after each ',' in a template parameter list.
+extern Option<bool>
+nl_template_args;
+
+// Whether to add a newline before '>' of a template parameter list.
+extern Option<bool>
+nl_template_end;
 
 // (OC) Whether to put each Objective-C message parameter on a separate line.
 // See nl_oc_msg_leave_one_liner.
@@ -2138,6 +2320,14 @@ nl_before_return;
 extern Option<bool>
 nl_after_return;
 
+// (Java) Whether to put a blank line before a member '.' or '->' operators.
+extern Option<iarf_e>
+nl_before_member;
+
+// (Java) Whether to put a blank line after a member '.' or '->' operators.
+extern Option<iarf_e>
+nl_after_member;
+
 // Whether to double-space commented-entries in 'struct'/'union'/'enum'.
 extern Option<bool>
 nl_ds_struct_enum_cmt;
@@ -2183,6 +2373,12 @@ nl_create_while_one_liner;
 // a single line.
 extern Option<bool>
 nl_create_func_def_one_liner;
+
+// Whether to collapse a function definition whose body (not counting braces)
+// is only one line so that the entire definition (prototype, braces, body) is
+// a single line.
+extern Option<bool>
+nl_create_list_one_liner;
 
 // Whether to split one-line simple unbraced if statements into two lines by
 // adding a newline, as in 'if(b) <here> i++;'.
@@ -2275,26 +2471,26 @@ nl_after_func_body_one_liner;
 // The number of blank lines after a block of variable definitions at the top
 // of a function body.
 //
-// 0 = No change (default).
+// 0: No change (default).
 extern BoundedOption<unsigned, 0, 16>
 nl_func_var_def_blk;
 
 // The number of newlines before a block of typedefs. If nl_after_access_spec
 // is non-zero, that option takes precedence.
 //
-// 0 = No change (default).
+// 0: No change (default).
 extern BoundedOption<unsigned, 0, 16>
 nl_typedef_blk_start;
 
 // The number of newlines after a block of typedefs.
 //
-// 0 = No change (default).
+// 0: No change (default).
 extern BoundedOption<unsigned, 0, 16>
 nl_typedef_blk_end;
 
 // The maximum number of consecutive newlines within a block of typedefs.
 //
-// 0 = No change (default).
+// 0: No change (default).
 extern BoundedOption<unsigned, 0, 16>
 nl_typedef_blk_in;
 
@@ -2302,21 +2498,21 @@ nl_typedef_blk_in;
 // of a function body. If nl_after_access_spec is non-zero, that option takes
 // precedence.
 //
-// 0 = No change (default).
+// 0: No change (default).
 extern BoundedOption<unsigned, 0, 16>
 nl_var_def_blk_start;
 
 // The number of newlines after a block of variable definitions not at the top
 // of a function body.
 //
-// 0 = No change (default).
+// 0: No change (default).
 extern BoundedOption<unsigned, 0, 16>
 nl_var_def_blk_end;
 
 // The maximum number of consecutive newlines within a block of variable
 // definitions.
 //
-// 0 = No change (default).
+// 0: No change (default).
 extern BoundedOption<unsigned, 0, 16>
 nl_var_def_blk_in;
 
@@ -2355,11 +2551,29 @@ nl_before_class;
 extern BoundedOption<unsigned, 0, 16>
 nl_after_class;
 
+// The number of newlines before a namespace.
+extern BoundedOption<unsigned, 0, 16>
+nl_before_namespace;
+
+// The number of newlines after '{' of a namespace. This also adds newlines
+// before the matching '}'.
+//
+// 0: Apply eat_blanks_after_open_brace or eat_blanks_before_close_brace if
+//     applicable, otherwise no change.
+//
+// Overrides eat_blanks_after_open_brace and eat_blanks_before_close_brace.
+extern BoundedOption<unsigned, 0, 16>
+nl_inside_namespace;
+
+// The number of newlines after '}' of a namespace.
+extern BoundedOption<unsigned, 0, 16>
+nl_after_namespace;
+
 // The number of newlines before an access specifier label. This also includes
 // the Qt-specific 'signals:' and 'slots:'. Will not change the newline count
 // if after a brace open.
 //
-// 0 = No change (default).
+// 0: No change (default).
 extern BoundedOption<unsigned, 0, 16>
 nl_before_access_spec;
 
@@ -2367,7 +2581,7 @@ nl_before_access_spec;
 // the Qt-specific 'signals:' and 'slots:'. Will not change the newline count
 // if after a brace open.
 //
-// 0 = No change (default).
+// 0: No change (default).
 //
 // Overrides nl_typedef_blk_start and nl_var_def_blk_start.
 extern BoundedOption<unsigned, 0, 16>
@@ -2376,43 +2590,33 @@ nl_after_access_spec;
 // The number of newlines between a function definition and the function
 // comment, as in '// comment\n <here> void foo() {...}'.
 //
-// 0 = No change (default).
+// 0: No change (default).
 extern BoundedOption<unsigned, 0, 16>
 nl_comment_func_def;
 
 // The number of newlines after a try-catch-finally block that isn't followed
 // by a brace close.
 //
-// 0 = No change (default).
+// 0: No change (default).
 extern BoundedOption<unsigned, 0, 16>
 nl_after_try_catch_finally;
 
 // (C#) The number of newlines before and after a property, indexer or event
 // declaration.
 //
-// 0 = No change (default).
+// 0: No change (default).
 extern BoundedOption<unsigned, 0, 16>
 nl_around_cs_property;
 
 // (C#) The number of newlines between the get/set/add/remove handlers.
 //
-// 0 = No change (default).
+// 0: No change (default).
 extern BoundedOption<unsigned, 0, 16>
 nl_between_get_set;
 
 // (C#) Add or remove newline between property and the '{'.
 extern Option<iarf_e>
 nl_property_brace;
-
-// The number of newlines after '{' of a namespace. This also adds newlines
-// before the matching '}'.
-//
-// 0 = Apply eat_blanks_after_open_brace or eat_blanks_before_close_brace if
-//     applicable, otherwise no change.
-//
-// Overrides eat_blanks_after_open_brace and eat_blanks_before_close_brace.
-extern BoundedOption<unsigned, 0, 16>
-nl_inside_namespace;
 
 // Whether to remove blank lines after '{'.
 extern Option<bool>
@@ -2549,14 +2753,14 @@ align_func_params;
 
 // The span for aligning parameter definitions in function on parameter name.
 //
-// 0 = Don't align (default).
+// 0: Don't align (default).
 extern BoundedOption<unsigned, 0, 16>
 align_func_params_span;
 
 // The threshold for aligning function parameter definitions.
 // Use a negative number for absolute thresholds.
 //
-// 0 = No limit (default).
+// 0: No limit (default).
 extern BoundedOption<signed, -1000, 5000>
 align_func_params_thresh;
 
@@ -2566,14 +2770,14 @@ align_func_params_gap;
 
 // The span for aligning constructor value.
 //
-// 0 = Don't align (default).
+// 0: Don't align (default).
 extern BoundedOption<unsigned, 0, 16>
 align_constr_value_span;
 
 // The threshold for aligning constructor value.
 // Use a negative number for absolute thresholds.
 //
-// 0 = No limit (default).
+// 0: No limit (default).
 extern BoundedOption<signed, -1000, 5000>
 align_constr_value_thresh;
 
@@ -2588,7 +2792,7 @@ align_same_func_call_params;
 
 // The span for aligning function-call parameters for single line functions.
 //
-// 0 = Don't align (default).
+// 0: Don't align (default).
 extern BoundedOption<unsigned, 0, 5000>
 align_same_func_call_params_span;
 
@@ -2596,13 +2800,13 @@ align_same_func_call_params_span;
 // functions.
 // Use a negative number for absolute thresholds.
 //
-// 0 = No limit (default).
+// 0: No limit (default).
 extern BoundedOption<signed, -1000, 5000>
 align_same_func_call_params_thresh;
 
 // The span for aligning variable definitions.
 //
-// 0 = Don't align (default).
+// 0: Don't align (default).
 extern BoundedOption<unsigned, 0, 5000>
 align_var_def_span;
 
@@ -2627,7 +2831,7 @@ align_var_def_amp_style;
 // The threshold for aligning variable definitions.
 // Use a negative number for absolute thresholds.
 //
-// 0 = No limit (default).
+// 0: No limit (default).
 extern BoundedOption<signed, -1000, 5000>
 align_var_def_thresh;
 
@@ -2653,20 +2857,20 @@ align_var_def_inline;
 
 // The span for aligning on '=' in assignments.
 //
-// 0 = Don't align (default).
+// 0: Don't align (default).
 extern BoundedOption<unsigned, 0, 5000>
 align_assign_span;
 
 // The span for aligning on '=' in function prototype modifier.
 //
-// 0 = Don't align (default).
+// 0: Don't align (default).
 extern BoundedOption<unsigned, 0, 5000>
 align_assign_func_proto_span;
 
 // The threshold for aligning on '=' in assignments.
 // Use a negative number for absolute thresholds.
 //
-// 0 = No limit (default).
+// 0: No limit (default).
 extern BoundedOption<signed, -1000, 5000>
 align_assign_thresh;
 
@@ -2681,27 +2885,27 @@ align_assign_decl_func;
 
 // The span for aligning on '=' in enums.
 //
-// 0 = Don't align (default).
+// 0: Don't align (default).
 extern BoundedOption<unsigned, 0, 5000>
 align_enum_equ_span;
 
 // The threshold for aligning on '=' in enums.
 // Use a negative number for absolute thresholds.
 //
-// 0 = no limit (default).
+// 0: no limit (default).
 extern BoundedOption<signed, -1000, 5000>
 align_enum_equ_thresh;
 
 // The span for aligning class member definitions.
 //
-// 0 = Don't align (default).
+// 0: Don't align (default).
 extern BoundedOption<unsigned, 0, 5000>
 align_var_class_span;
 
 // The threshold for aligning class member definitions.
 // Use a negative number for absolute thresholds.
 //
-// 0 = No limit (default).
+// 0: No limit (default).
 extern BoundedOption<signed, -1000, 5000>
 align_var_class_thresh;
 
@@ -2711,14 +2915,14 @@ align_var_class_gap;
 
 // The span for aligning struct/union member definitions.
 //
-// 0 = Don't align (default).
+// 0: Don't align (default).
 extern BoundedOption<unsigned, 0, 5000>
 align_var_struct_span;
 
 // The threshold for aligning struct/union member definitions.
 // Use a negative number for absolute thresholds.
 //
-// 0 = No limit (default).
+// 0: No limit (default).
 extern BoundedOption<signed, -1000, 5000>
 align_var_struct_thresh;
 
@@ -2728,13 +2932,13 @@ align_var_struct_gap;
 
 // The span for aligning struct initializer values.
 //
-// 0 = Don't align (default).
+// 0: Don't align (default).
 extern BoundedOption<unsigned, 0, 5000>
 align_struct_init_span;
 
 // The span for aligning single-line typedefs.
 //
-// 0 = Don't align (default).
+// 0: Don't align (default).
 extern BoundedOption<unsigned, 0, 16>
 align_typedef_span;
 
@@ -2770,7 +2974,7 @@ align_typedef_amp_style;
 
 // The span for aligning comments that end lines.
 //
-// 0 = Don't align (default).
+// 0: Don't align (default).
 extern BoundedOption<unsigned, 0, 5000>
 align_right_cmt_span;
 
@@ -2793,20 +2997,20 @@ align_right_cmt_same_level;
 // aligned beyond this column, but which can be aligned in a lesser column,
 // may be "pulled in".
 //
-// 0 = Ignore (default).
+// 0: Ignore (default).
 extern BoundedOption<unsigned, 0, 200>
 align_right_cmt_at_col;
 
 // The span for aligning function prototypes.
 //
-// 0 = Don't align (default).
+// 0: Don't align (default).
 extern BoundedOption<unsigned, 0, 5000>
 align_func_proto_span;
 
 // The threshold for aligning function prototypes.
 // Use a negative number for absolute thresholds.
 //
-// 0 = No limit (default).
+// 0: No limit (default).
 extern BoundedOption<signed, -1000, 5000>
 align_func_proto_thresh;
 
@@ -2840,7 +3044,7 @@ align_single_line_brace_gap;
 
 // (OC) The span for aligning Objective-C message specifications.
 //
-// 0 = Don't align (default).
+// 0: Don't align (default).
 extern BoundedOption<unsigned, 0, 5000>
 align_oc_msg_spec_span;
 
@@ -2875,7 +3079,7 @@ align_asm_colon;
 // (OC) Span for aligning parameters in an Objective-C message call
 // on the ':'.
 //
-// 0 = Don't align.
+// 0: Don't align.
 extern BoundedOption<unsigned, 0, 5000>
 align_oc_msg_colon_span;
 
@@ -3124,33 +3328,37 @@ mod_remove_extra_semicolon;
 
 // If a function body exceeds the specified number of newlines and doesn't have
 // a comment after the close brace, a comment will be added.
-extern BoundedOption<unsigned, 0, 50>
+extern BoundedOption<unsigned, 0, 255>
 mod_add_long_function_closebrace_comment;
 
 // If a namespace body exceeds the specified number of newlines and doesn't
 // have a comment after the close brace, a comment will be added.
-extern BoundedOption<unsigned, 0, 16>
+extern BoundedOption<unsigned, 0, 255>
 mod_add_long_namespace_closebrace_comment;
 
 // If a class body exceeds the specified number of newlines and doesn't have a
 // comment after the close brace, a comment will be added.
-extern BoundedOption<unsigned, 0, 16>
+extern BoundedOption<unsigned, 0, 255>
 mod_add_long_class_closebrace_comment;
 
 // If a switch body exceeds the specified number of newlines and doesn't have a
 // comment after the close brace, a comment will be added.
-extern BoundedOption<unsigned, 0, 50>
+extern BoundedOption<unsigned, 0, 255>
 mod_add_long_switch_closebrace_comment;
 
 // If an #ifdef body exceeds the specified number of newlines and doesn't have
 // a comment after the #endif, a comment will be added.
-extern BoundedOption<unsigned, 0, 16>
+extern BoundedOption<unsigned, 0, 255>
 mod_add_long_ifdef_endif_comment;
 
 // If an #ifdef or #else body exceeds the specified number of newlines and
 // doesn't have a comment after the #else, a comment will be added.
-extern BoundedOption<unsigned, 0, 16>
+extern BoundedOption<unsigned, 0, 255>
 mod_add_long_ifdef_else_comment;
+
+// Whether to take care of the case by the mod_sort_xx options.
+extern Option<bool>
+mod_sort_case_sensitive;
 
 // Whether to sort consecutive single-line 'import' statements.
 extern Option<bool>
@@ -3364,6 +3572,12 @@ use_indent_continue_only_once;
 // false: indentation will be used every time (default)
 extern Option<bool>
 indent_cpp_lambda_only_once;
+
+// Whether sp_after_angle takes precedence over sp_inside_fparen. This was the
+// historic behavior, but is probably not the desired behavior, so this is off
+// by default.
+extern Option<bool>
+use_sp_after_angle_always;
 
 // Whether to apply special formatting for Qt SIGNAL/SLOT macros. Essentially,
 // this tries to format these so that they match Qt's normalized form (i.e. the

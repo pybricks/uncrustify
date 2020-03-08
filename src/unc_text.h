@@ -7,13 +7,16 @@
  * @author  Ben Gardner
  * @license GPL v2+
  */
+
 #ifndef UNC_TEXT_H_INCLUDED
 #define UNC_TEXT_H_INCLUDED
 
 #include "base_types.h"
-#include <vector>
+
 #include <deque>
 #include <string>
+#include <vector>
+
 
 /**
  *  abbreviations used:
@@ -66,13 +69,13 @@ public:
    void set(const value_type &data, size_t idx = 0, size_t len = 0);
 
 
-   unc_text &operator =(int ch);
+   unc_text &operator=(int ch);
 
-   unc_text &operator =(const unc_text &ref);
+   unc_text &operator=(const unc_text &ref);
 
-   unc_text &operator =(const std::string &ascii_text);
+   unc_text &operator=(const std::string &ascii_text);
 
-   unc_text &operator =(const char *ascii_text);
+   unc_text &operator=(const char *ascii_text);
 
 
    void insert(size_t idx, int ch);
@@ -104,13 +107,13 @@ public:
    void append(const value_type &data, size_t idx = 0, size_t len = 0);
 
 
-   unc_text &operator +=(int ch);
+   unc_text &operator+=(int ch);
 
-   unc_text &operator +=(const unc_text &ref);
+   unc_text &operator+=(const unc_text &ref);
 
-   unc_text &operator +=(const std::string &ascii_text);
+   unc_text &operator+=(const std::string &ascii_text);
 
-   unc_text &operator +=(const char *ascii_text);
+   unc_text &operator+=(const char *ascii_text);
 
 
    //! Returns the UTF-8 string for logging
@@ -123,12 +126,13 @@ public:
     * @param ref1  first  instance to compare
     * @param ref2  second instance to compare
     * @param len   number of character to compare
+    * @param tcare take care of case (lower case/ upper case)                  Issue #2091
     *
     * @retval == 0  both text elements are equal
     * @retval  > 0
     * @retval  < 0
     */
-   static int compare(const unc_text &ref1, const unc_text &ref2, size_t len = 0);
+   static int compare(const unc_text &ref1, const unc_text &ref2, size_t len = 0, bool tcare = false);
 
 
    bool equals(const unc_text &ref) const;

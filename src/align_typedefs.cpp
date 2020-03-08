@@ -8,6 +8,7 @@
  */
 
 #include "align_typedefs.h"
+
 #include "align_stack.h"
 #include "chunk_list.h"
 
@@ -26,6 +27,7 @@ void align_typedefs(size_t span)
 
    chunk_t *c_typedef = nullptr;
    chunk_t *pc        = chunk_get_head();
+
    while (pc != nullptr)
    {
       if (chunk_is_newline(pc))
@@ -35,7 +37,7 @@ void align_typedefs(size_t span)
       }
       else if (c_typedef != nullptr)
       {
-         if (pc->flags & PCF_ANCHOR)
+         if (pc->flags.test(PCF_ANCHOR))
          {
             as.Add(pc);
             LOG_FMT(LALTD, "%s(%d): typedef @ %zu:%zu, tag '%s' @ %zu:%zu\n",
@@ -51,9 +53,7 @@ void align_typedefs(size_t span)
             c_typedef = pc;
          }
       }
-
       pc = chunk_get_next(pc);
    }
-
    as.End();
 } // align_typedefs

@@ -13,11 +13,13 @@
 void ChunkStack::Set(const ChunkStack &cs)
 {
    m_cse.resize(cs.m_cse.size());
+
    for (size_t idx = 0; idx < m_cse.size(); idx++)
    {
       m_cse[idx].m_pc     = cs.m_cse[idx].m_pc;
       m_cse[idx].m_seqnum = cs.m_cse[idx].m_seqnum;
    }
+
    m_seqnum = cs.m_seqnum;
 }
 
@@ -81,6 +83,7 @@ chunk_t *ChunkStack::Pop_Back()
 void ChunkStack::Push_Back(chunk_t *pc, size_t seqnum)
 {
    m_cse.push_back(Entry(seqnum, pc));
+
    if (m_seqnum < seqnum)
    {
       m_seqnum = seqnum;
@@ -113,5 +116,6 @@ void ChunkStack::Collapse()
          wr_idx++;
       }
    }
+
    m_cse.resize(wr_idx);
 }

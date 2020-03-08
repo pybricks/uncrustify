@@ -8,9 +8,11 @@
  */
 
 #include "unc_tools.h"
-#include "uncrustify.h"
+
 #include "args.h"
 #include "output.h"
+#include "uncrustify.h"
+
 
 #ifdef DEVELOP_ONLY
 /*
@@ -31,62 +33,73 @@ static size_t tokenCounter;
 
 // protocol of the line
 // examples:
-//   prot_the_line(__LINE__, pc->orig_line);
-//   prot_the_line(__LINE__, 6);
+//   prot_the_line(__func__, __LINE__, pc->orig_line);
+//   prot_the_line(__func__, __LINE__, 6, 5);
 //   prot_the_source(__LINE__);
 // log_pcf_flags(LSYS, pc->flags);
-void prot_the_line(int theLine, unsigned int actual_line)
+// if partNumber is zero, all the tokens of the line are shown,
+// if partNumber is NOT zero, only the token with this partNumber is shown.
+void prot_the_line(const char *func_name, int theLine, unsigned int actual_line, size_t partNumber)
 {
    counter++;
    tokenCounter = 0;
-   LOG_FMT(LGUY, "Prot_the_line:(%d)(%zu)\n", theLine, counter);
+   LOG_FMT(LGUY, "Prot_the_line:(%s:%d)(%zu)\n", func_name, theLine, counter);
+
    for (chunk_t *pc = chunk_get_head(); pc != nullptr; pc = pc->next)
    {
       if (pc->orig_line == actual_line)
       {
          tokenCounter++;
-         LOG_FMT(LGUY, " orig_line is %d, (%zu) ", actual_line, tokenCounter);
-         if (chunk_is_token(pc, CT_VBRACE_OPEN))
+
+         if (  partNumber == 0
+            || partNumber == tokenCounter)
          {
-            LOG_FMT(LGUY, "<VBRACE_OPEN>, ");
-         }
-         else if (chunk_is_token(pc, CT_NEWLINE))
-         {
-            LOG_FMT(LGUY, "<NL>(nl_count is %zu), ", pc->nl_count);
-         }
-         else if (chunk_is_token(pc, CT_VBRACE_CLOSE))
-         {
-            LOG_FMT(LGUY, "<CT_VBRACE_CLOSE>, ");
-         }
-         else if (chunk_is_token(pc, CT_VBRACE_OPEN))
-         {
-            LOG_FMT(LGUY, "<CT_VBRACE_OPEN>, ");
-         }
-         else if (chunk_is_token(pc, CT_SPACE))
-         {
-            LOG_FMT(LGUY, "<CT_SPACE>, ");
-         }
-         else if (chunk_is_token(pc, CT_IGNORED))
-         {
-            LOG_FMT(LGUY, "<IGNORED> ");
-         }
-         else
-         {
-            LOG_FMT(LGUY, "text() '%s', ", pc->text());
-         }
-         LOG_FMT(LGUY, " column is %zu, type is %s, parent_type is %s, orig_col is %zu,",
-                 pc->column, get_token_name(pc->type), get_token_name(pc->parent_type), pc->orig_col);
-         if (chunk_is_token(pc, CT_IGNORED))
-         {
-            LOG_FMT(LGUY, "\n");
-         }
-         else
-         {
-            LOG_FMT(LGUY, " pc->flags: ");
-            log_pcf_flags(LGUY, pc->flags);
+            LOG_FMT(LGUY, " orig_line is %d, (%zu) ", actual_line, tokenCounter);
+
+            if (chunk_is_token(pc, CT_VBRACE_OPEN))
+            {
+               LOG_FMT(LGUY, "<VBRACE_OPEN>, ");
+            }
+            else if (chunk_is_token(pc, CT_NEWLINE))
+            {
+               LOG_FMT(LGUY, "<NL>(nl_count is %zu), ", pc->nl_count);
+            }
+            else if (chunk_is_token(pc, CT_VBRACE_CLOSE))
+            {
+               LOG_FMT(LGUY, "<CT_VBRACE_CLOSE>, ");
+            }
+            else if (chunk_is_token(pc, CT_VBRACE_OPEN))
+            {
+               LOG_FMT(LGUY, "<CT_VBRACE_OPEN>, ");
+            }
+            else if (chunk_is_token(pc, CT_SPACE))
+            {
+               LOG_FMT(LGUY, "<CT_SPACE>, ");
+            }
+            else if (chunk_is_token(pc, CT_IGNORED))
+            {
+               LOG_FMT(LGUY, "<IGNORED> ");
+            }
+            else
+            {
+               LOG_FMT(LGUY, "text() '%s', ", pc->text());
+            }
+            LOG_FMT(LGUY, " column is %zu, type is %s, parent_type is %s, orig_col is %zu,",
+                    pc->column, get_token_name(pc->type), get_token_name(pc->parent_type), pc->orig_col);
+
+            if (chunk_is_token(pc, CT_IGNORED))
+            {
+               LOG_FMT(LGUY, "\n");
+            }
+            else
+            {
+               LOG_FMT(LGUY, " pc->flags: ");
+               log_pcf_flags(LGUY, pc->flags);
+            }
          }
       }
    }
+
    LOG_FMT(LGUY, "\n");
 } // prot_the_line
 
@@ -106,9 +119,11 @@ void examine_Data(const char *func_name, int theLine, int what)
    LOG_FMT(LGUY, "\n%s:", func_name);
 
    chunk_t *pc;
+
    switch (what)
    {
    case 1:
+
       for (pc = chunk_get_head(); pc != nullptr; pc = pc->next)
       {
          if (chunk_is_token(pc, CT_SQUARE_CLOSE) || chunk_is_token(pc, CT_TSQUARE))
@@ -118,10 +133,12 @@ void examine_Data(const char *func_name, int theLine, int what)
             LOG_FMT(LGUY, "%s, orig_col=%zu, orig_col_end=%zu\n", pc->text(), pc->orig_col, pc->orig_col_end);
          }
       }
+
       break;
 
    case 2:
       LOG_FMT(LGUY, "2:(%d)\n", theLine);
+
       for (pc = chunk_get_head(); pc != nullptr; pc = pc->next)
       {
          if (pc->orig_line == 7)
@@ -136,10 +153,12 @@ void examine_Data(const char *func_name, int theLine, int what)
             }
          }
       }
+
       break;
 
    case 3:
       LOG_FMT(LGUY, "3:(%d)\n", theLine);
+
       for (pc = chunk_get_head(); pc != nullptr; pc = pc->next)
       {
          if (chunk_is_token(pc, CT_NEWLINE))
@@ -151,10 +170,12 @@ void examine_Data(const char *func_name, int theLine, int what)
             LOG_FMT(LGUY, "(%zu)%s %s, col=%zu, column=%zu\n", pc->orig_line, pc->text(), get_token_name(pc->type), pc->orig_col, pc->column);
          }
       }
+
       break;
 
    case 4:
       LOG_FMT(LGUY, "4:(%d)\n", theLine);
+
       for (pc = chunk_get_head(); pc != nullptr; pc = pc->next)
       {
          if (pc->orig_line == 6)
@@ -169,6 +190,7 @@ void examine_Data(const char *func_name, int theLine, int what)
             }
          }
       }
+
       break;
 
    default:
@@ -190,6 +212,7 @@ void dump_out(unsigned int type)
       sprintf(dumpFileName, "%s.%u", cpd.dumped_file, type);
    }
    FILE *D_file = fopen(dumpFileName, "w");
+
    if (D_file != nullptr)
    {
       for (chunk_t *pc = chunk_get_head(); pc != nullptr; pc = pc->next)
@@ -199,47 +222,58 @@ void dump_out(unsigned int type)
          fprintf(D_file, "  orig_line %zu\n", pc->orig_line);
          fprintf(D_file, "  orig_col %zu\n", pc->orig_col);
          fprintf(D_file, "  orig_col_end %zu\n", pc->orig_col_end);
+
          if (pc->orig_prev_sp != 0)
          {
             fprintf(D_file, "  orig_prev_sp %u\n", pc->orig_prev_sp);
          }
+
          if (pc->flags != 0)
          {
             fprintf(D_file, "  flags %" PRIu64 "\n", pc->flags);
          }
+
          if (pc->column != 0)
          {
             fprintf(D_file, "  column %zu\n", pc->column);
          }
+
          if (pc->column_indent != 0)
          {
             fprintf(D_file, "  column_indent %zu\n", pc->column_indent);
          }
+
          if (pc->nl_count != 0)
          {
             fprintf(D_file, "  nl_count %zu\n", pc->nl_count);
          }
+
          if (pc->level != 0)
          {
             fprintf(D_file, "  level %zu\n", pc->level);
          }
+
          if (pc->brace_level != 0)
          {
             fprintf(D_file, "  brace_level %zu\n", pc->brace_level);
          }
+
          if (pc->pp_level != 0)
          {
             fprintf(D_file, "  pp_level %zu\n", pc->pp_level);
          }
+
          if (pc->after_tab != 0)
          {
             fprintf(D_file, "  after_tab %d\n", pc->after_tab);
          }
+
          if (pc->type != CT_NEWLINE)
          {
             fprintf(D_file, "  text %s\n", pc->text());
          }
       }
+
       fclose(D_file);
    }
 } // dump_out
@@ -265,13 +299,16 @@ void dump_in(unsigned int type)
    if (D_file != nullptr)
    {
       unsigned int lineNumber = 0;
+
       while (fgets(buffer, sizeof(buffer), D_file) != nullptr)
       {
          ++lineNumber;
+
          if (aNewChunkIsFound)
          {
             // look for the next chunk
             char first = buffer[0];
+
             if (first == '[')
             {
                aNewChunkIsFound = false;
@@ -287,6 +324,7 @@ void dump_in(unsigned int type)
 #define NUMBER_OF_PARTS    3
             char *parts[NUMBER_OF_PARTS];
             int partCount = Args::SplitLine(buffer, parts, NUMBER_OF_PARTS - 1);
+
             if (partCount != 2)
             {
                exit(EX_SOFTWARE);
@@ -343,6 +381,7 @@ void dump_in(unsigned int type)
          {
             // look for a new chunk
             char first = buffer[0];
+
             if (first == '[')
             {
                aNewChunkIsFound = true;

@@ -148,6 +148,7 @@ enum c_token_t
 
    CT_ASM,
    CT_ATTRIBUTE,
+   CT_AUTORELEASEPOOL,     // OC: Autorelease Pool Blocks, used by iOS
    CT_OC_AVAILABLE,
    CT_OC_AVAILABLE_VALUE,
    CT_CATCH,
@@ -251,6 +252,8 @@ enum c_token_t
    CT_TYPE_WRAP,        // macro that wraps a type name
    CT_CPP_LAMBDA,       // parent for '[=](...){...}'
    CT_CPP_LAMBDA_RET,   // '->' in '[=](...) -> type {...}'
+   CT_TRAILING_RET,     // '->' in 'auto fname(...) -> type;'
+                        // '->' in 'auto fname(...) const -> type;'
    CT_BIT_COLON,        // a ':' in a variable declaration
 
    CT_OC_DYNAMIC,

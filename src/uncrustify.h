@@ -5,14 +5,16 @@
  * @author  Ben Gardner
  * @license GPL v2+
  */
+
 #ifndef UNCRUSTIFY_H_INCLUDED
 #define UNCRUSTIFY_H_INCLUDED
 
-#include <stdio.h>
-#include "token_enum.h"
-#include "log_levels.h"
 #include "base_types.h"
+#include "log_levels.h"
+#include "token_enum.h"
 #include "uncrustify_types.h"
+
+#include <stdio.h>
 
 int load_header_files(void);
 
@@ -43,8 +45,10 @@ const char *language_name_from_flags(size_t lang);
  */
 c_token_t find_token_name(const char *text);
 
+std::string pcf_flags_str(pcf_flags_t flags);
 
-void log_pcf_flags(log_sev_t sev, UINT64 flags);
+
+void log_pcf_flags(log_sev_t sev, pcf_flags_t flags);
 
 
 /**

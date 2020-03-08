@@ -17,7 +17,7 @@ The '-f' and '-o' options may not be used with '-F' or '--replace'.
 The '--prefix' and '--suffix' options may not be used with '--replace'.
 
 Basic Options:
- -c CFG       : Use the config file CFG.
+ -c CFG       : Use the config file CFG, or defaults if CFG is set to '-'.
  -f FILE      : Process the single file FILE (output to stdout, use with -o).
  -o FILE      : Redirect stdout to FILE.
  -F FILE      : Read files to process from FILE, one filename per line (- is stdin).
@@ -41,6 +41,7 @@ Basic Options:
 Config/Help Options:
  -h -? --help --usage     : Print this message and exit.
  --version                : Print the version and exit.
+ --count-options          : Print the number of available options and exit.
  --show-config            : Print out option documentation and exit.
  --update-config          : Output a new config file. Use with -o FILE.
  --update-config-with-doc : Output a new config file. Use with -o FILE.
@@ -50,7 +51,8 @@ Config/Help Options:
  --set <option>=<value>   : Sets a new value to a config option.
 
 Debug Options:
- -p FILE      : Dump debug info to a file. Must be used with the option -f FILE.
+ -p FILE      : Dump debug info into FILE, or to stdout if FILE is set to '-'.
+                Must be used in combination with '-f FILE'
  -L SEV       : Set the log severity (see log_levels.h; note 'A' = 'all')
  -s           : Show the log severity in the logs.
  --decode     : Decode remaining args (chunk flags) and exit.
@@ -71,4 +73,3 @@ Note: Use comments containing ' *INDENT-OFF*' and ' *INDENT-ON*' to disable
 
 There are currently x options and minimal documentation.
 Try UniversalIndentGUI and good luck.
-

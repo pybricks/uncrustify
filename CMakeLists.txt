@@ -17,6 +17,8 @@ include(CheckCXXSymbolExists)
 include(CheckTypeSize)
 include(CTest)
 
+find_package(PythonInterp REQUIRED)
+
 #
 # Check compiler flags
 #
@@ -127,38 +129,30 @@ endif()
 # Generate uncrustify_version.h
 #
 
-# FIXME: the version number should be automatically integrated
-set(CURRENT_VERSION "Uncrustify-0.69.0_f")
+set(UNCRUSTIFY_VERSION "0.70.1_f")
 
-find_package(PythonInterp REQUIRED)
 option(NoGitVersionString "Do not use make_version.py and git to build a version string" OFF)
-if(NOT NoGitVersionString)
-  set(version_debug_flag "")
-  STRING(REGEX MATCH "-g[0-3]?" version_debug_flag ${CMAKE_CXX_FLAGS})
-
-  # checking for build type and passing it to make_version.py
-  # FIXME: does not work with VS .sln projects
-  if(NOT "${version_debug_flag}" STREQUAL "" OR "${CMAKE_BUILD_TYPE}" STREQUAL "Debug" )
-    set(version_debug_flag "Debug")
-  endif()
-
-  execute_process(
-    COMMAND ${PYTHON_EXECUTABLE} scripts/make_version.py ${version_debug_flag}
-    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
-    RESULT_VARIABLE make_version_error
-    OUTPUT_VARIABLE make_version_output
+if(NoGitVersionString)
+  configure_file(src/uncrustify_version.h.in uncrustify_version.h @ONLY)
+  add_custom_target(generate_version_header) # Dummy target
+else()
+  # Add target to generate version header;
+  # do this every build to ensure git SHA is up to date
+  add_custom_target(generate_version_header
+    ${CMAKE_COMMAND}
+    -D PYTHON_EXECUTABLE:STRING=${PYTHON_EXECUTABLE}
+    -D SOURCE_DIR:PATH="${PROJECT_SOURCE_DIR}"
+    -D INPUT:PATH="${PROJECT_SOURCE_DIR}/src/uncrustify_version.h.in"
+    -D OUTPUT:PATH="${PROJECT_BINARY_DIR}/uncrustify_version.h"
+    -D UNCRUSTIFY_VERSION:STRING="${UNCRUSTIFY_VERSION}"
+    -P ${PROJECT_SOURCE_DIR}/cmake/GenerateVersionHeader.cmake
+    COMMENT "Generating version header"
   )
-
-  if (make_version_error)
-    message(STATUS "scripts/make_version.py exited with code ${make_version_error}: ${make_version_output}\n"
-                   "As a fallback, version '${CURRENT_VERSION}' will be used.")
-  else()
-    string(STRIP ${make_version_output} CURRENT_VERSION)
-    message(STATUS "Version: '${CURRENT_VERSION}'")
-  endif()
+  set_source_files_properties(
+    "${CMAKE_CURRENT_BINARY_DIR}/uncrustify_version.h"
+    PROPERTIES GENERATED TRUE
+  )
 endif()
-
-configure_file(src/uncrustify_version.h.in uncrustify_version.h @ONLY)
 
 #
 # Generate token_names.h
@@ -179,7 +173,11 @@ function(py_gen OUTPUT SCRIPT INPUT)
   set(deps "${PROJECT_SOURCE_DIR}/src/${INPUT}")
   get_filename_component(outdir "${out}" DIRECTORY)
   foreach(arg IN LISTS ARGN)
-    list(APPEND deps "${PROJECT_SOURCE_DIR}/src/${arg}")
+    if (IS_ABSOLUTE "${arg}")
+      list(APPEND deps "${arg}")
+    else()
+      list(APPEND deps "${PROJECT_SOURCE_DIR}/src/${arg}")
+    endif()
   endforeach()
 
   add_custom_command(
@@ -221,6 +219,7 @@ py_gen(option_enum.cpp
 py_gen(../etc/uncrustify.xml
   make_katehl.py
   ../etc/uncrustify.xml.in
+  "${PROJECT_BINARY_DIR}/uncrustify_version.h"
   options.h
   option.h
   token_enum.h
@@ -259,8 +258,10 @@ set(uncrustify_sources
   src/ChunkStack.cpp
   src/chunk_list.cpp
   src/combine.cpp
+  src/combine_labels.cpp
   src/compat_posix.cpp
   src/compat_win32.cpp
+  src/cs_top_is_question.cpp
   src/detect.cpp
   src/enum_cleanup.cpp
   src/flag_parens.cpp
@@ -286,12 +287,15 @@ set(uncrustify_sources
   src/tokenize.cpp
   src/tokenize_cleanup.cpp
   src/uncrustify.cpp
+  src/uncrustify_emscripten.cpp
   src/uncrustify_types.cpp
   src/unc_text.cpp
   src/unc_tools.cpp
   src/unicode.cpp
   src/universalindentgui.cpp
   src/width.cpp
+  ${PROJECT_BINARY_DIR}/src/options.cpp
+  ${PROJECT_BINARY_DIR}/src/option_enum.cpp
 )
 
 set(uncrustify_headers
@@ -323,6 +327,8 @@ set(uncrustify_headers
   src/char_table.h
   src/ChunkStack.h
   src/chunk_list.h
+  src/combine_labels.h
+  src/cs_top_is_question.h
   src/enum_cleanup.h
   src/enum_flags.h
   src/flag_parens.h
@@ -345,12 +351,12 @@ set(uncrustify_headers
   src/unc_ctype.h
   src/unc_text.h
   src/unc_tools.h
-  ${PROJECT_BINARY_DIR}/src/options.cpp
-  ${PROJECT_BINARY_DIR}/src/option_enum.cpp
   ${PROJECT_BINARY_DIR}/src/option_enum.h
+  ${PROJECT_BINARY_DIR}/uncrustify_version.h
 )
 
 add_executable(uncrustify ${uncrustify_sources} ${uncrustify_headers})
+add_dependencies(uncrustify generate_version_header)
 
 if(CMAKE_VERSION VERSION_LESS 2.8.10)
   if(CMAKE_CONFIGURATION_TYPES OR CMAKE_BUILD_TYPE)
@@ -419,7 +425,7 @@ endforeach()
 # Package
 #
 set(CPACK_PACKAGE_NAME "uncrustify")
-set(CPACK_PACKAGE_VERSION "${CURRENT_VERSION}")
+set(CPACK_PACKAGE_VERSION "${UNCRUSTIFY_VERSION}")
 set(CPACK_PACKAGE_VENDOR "Ben Gardner")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Code beautifier")
 set(CPACK_PACKAGE_DESCRIPTION_FILE "${PROJECT_SOURCE_DIR}/README.md")
@@ -458,6 +464,10 @@ else()
   )
   install(FILES "${CMAKE_CURRENT_BINARY_DIR}/uncrustify.1"
     DESTINATION "${CMAKE_INSTALL_MANDIR}/man1"
+  )
+  install(DIRECTORY "${PROJECT_SOURCE_DIR}/etc/"
+    DESTINATION "${CMAKE_INSTALL_DATAROOTDIR}/uncrustify"
+    FILES_MATCHING PATTERN "*.cfg"
   )
 endif()
 

@@ -9,6 +9,7 @@
 #define CHUNK_LIST_H_INCLUDED
 
 #include "uncrustify_types.h"
+// necessary to not sort it
 #include "char_table.h"
 #include "language_tools.h"
 
@@ -189,7 +190,7 @@ chunk_t *chunk_get_next_nc(chunk_t *cur, scope_e scope = scope_e::ALL);
 
 
 /**
- * Gets the next non-NEWLINE and non-comment chunk
+ * Gets the next non-NEWLINE
  *
  * @param cur    chunk to use as start point
  * @param scope  code region to search in
@@ -533,7 +534,7 @@ static inline chunk_t *chunk_skip_to_match_rev(chunk_t *cur, scope_e scope = sco
 
 
 //! skip to the final word/type in a :: chain
-chunk_t *chunk_skip_dc_member(chunk_t *start, scope_e scope     = scope_e::ALL);
+chunk_t *chunk_skip_dc_member(chunk_t *start, scope_e scope = scope_e::ALL);
 chunk_t *chunk_skip_dc_member_rev(chunk_t *start, scope_e scope = scope_e::ALL);
 
 
@@ -609,7 +610,7 @@ static inline bool chunk_is_balanced_square(chunk_t *pc)
 
 static inline bool chunk_is_preproc(chunk_t *pc)
 {
-   return(pc != nullptr && (pc->flags & PCF_IN_PREPROC));
+   return(pc != nullptr && pc->flags.test(PCF_IN_PREPROC));
 }
 
 
@@ -644,6 +645,7 @@ static inline bool chunk_is_Doxygen_comment(chunk_t *pc)
    // check the third character
    const char   *sComment = pc->text();
    const size_t len       = strlen(sComment);
+
    if (len < 3)
    {
       return(false);
@@ -720,15 +722,13 @@ static inline bool chunk_is_addr(chunk_t *pc)
    {
       chunk_t *prev = chunk_get_prev(pc);
 
-      if (  (pc->flags & PCF_IN_TEMPLATE)
+      if (  pc->flags.test(PCF_IN_TEMPLATE)
          && (chunk_is_token(prev, CT_COMMA) || chunk_is_token(prev, CT_ANGLE_OPEN)))
       {
          return(false);
       }
-
       return(true);
    }
-
    return(false);
 }
 
@@ -833,15 +833,18 @@ static inline bool chunk_is_forin(chunk_t *pc)
       && chunk_is_token(pc, CT_SPAREN_OPEN))
    {
       chunk_t *prev = chunk_get_prev_ncnl(pc);
+
       if (chunk_is_token(prev, CT_FOR))
       {
          chunk_t *next = pc;
+
          while (  next != nullptr
                && next->type != CT_SPAREN_CLOSE
                && next->type != CT_IN)
          {
             next = chunk_get_next_ncnl(next);
          }
+
          if (chunk_is_token(next, CT_IN))
          {
             return(true);
@@ -869,7 +872,7 @@ void set_chunk_parent_real(chunk_t *pc, c_token_t tt);
 } while (false)
 
 
-void chunk_flags_set_real(chunk_t *pc, UINT64 clr_bits, UINT64 set_bits);
+void chunk_flags_set_real(chunk_t *pc, pcf_flags_t clr_bits, pcf_flags_t set_bits);
 
 
 #define chunk_flags_upd(pc, cc, ss)    do {   \
@@ -879,12 +882,12 @@ void chunk_flags_set_real(chunk_t *pc, UINT64 clr_bits, UINT64 set_bits);
 
 #define chunk_flags_set(pc, ss)        do { \
       LOG_FUNC_CALL();                      \
-      chunk_flags_set_real((pc), 0, (ss));  \
+      chunk_flags_set_real((pc), {}, (ss)); \
 } while (false)
 
 #define chunk_flags_clr(pc, cc)        do { \
       LOG_FUNC_CALL();                      \
-      chunk_flags_set_real((pc), (cc), 0);  \
+      chunk_flags_set_real((pc), (cc), {}); \
 } while (false)
 
 

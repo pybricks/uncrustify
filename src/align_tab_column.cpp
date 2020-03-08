@@ -8,9 +8,10 @@
  */
 
 #include "align_tab_column.h"
-#include "uncrustify_types.h"
+
 #include "chunk_list.h"
 #include "prototypes.h"
+#include "uncrustify_types.h"
 
 using namespace uncrustify;
 
@@ -28,6 +29,7 @@ size_t align_tab_column(size_t col)
    {
       col = 1;
    }
+
    if ((col % uncrustify::options::output_tab_size()) != 1)
    {
       col = next_tab_column(col);

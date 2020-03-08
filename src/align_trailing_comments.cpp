@@ -8,10 +8,11 @@
  */
 
 #include "align_trailing_comments.h"
+
 #include "align_add.h"
 #include "align_tab_column.h"
-#include "uncrustify.h"
 #include "indent.h"
+#include "uncrustify.h"
 
 using namespace uncrustify;
 
@@ -30,6 +31,7 @@ void align_stack(ChunkStack &cs, size_t col, bool align_single, log_sev_t sev)
    {
       LOG_FMT(sev, "%s(%d): max_col=%zu\n", __func__, __LINE__, col);
       chunk_t *pc;
+
       while ((pc = cs.Pop_Back()) != nullptr)
       {
          align_to_column(pc, col);
@@ -65,14 +67,13 @@ chunk_t *align_trailing_comments(chunk_t *start)
    while (  pc != nullptr
          && (nl_count < options::align_right_cmt_span()))
    {
-      if ((pc->flags & PCF_RIGHT_COMMENT) && pc->column > 1)
+      if (pc->flags.test(PCF_RIGHT_COMMENT) && pc->column > 1)
       {
          if (same_level && pc->brace_level != lvl)
          {
             pc = chunk_get_prev(pc);
             break;
          }
-
          cmt_type_cur = get_comment_align_type(pc);
 
          if (cmt_type_cur == cmt_type_start)
@@ -80,6 +81,7 @@ chunk_t *align_trailing_comments(chunk_t *start)
             LOG_FMT(LALADD, "%s(%d): line=%zu min_col=%zu pc->col=%zu pc->len=%zu %s\n",
                     __func__, __LINE__, pc->orig_line, min_col, pc->column, pc->len(),
                     get_token_name(pc->type));
+
             if (min_orig == 0 || min_orig > pc->column)
             {
                min_orig = pc->column;
@@ -88,25 +90,28 @@ chunk_t *align_trailing_comments(chunk_t *start)
             nl_count = 0;
          }
       }
+
       if (chunk_is_newline(pc))
       {
          nl_count += pc->nl_count;
       }
       pc = chunk_get_next(pc);
    }
-
    // Start with the minimum original column
    col = min_orig;
+
    // fall back to the intended column
    if (intended_col > 0 && col > intended_col)
    {
       col = intended_col;
    }
+
    // if less than allowed, bump it out
    if (col < min_col)
    {
       col = min_col;
    }
+
    // bump out to the intended column
    if (col < intended_col)
    {
@@ -114,6 +119,7 @@ chunk_t *align_trailing_comments(chunk_t *start)
    }
    LOG_FMT(LALADD, "%s(%d):  -- min_orig=%zu intended_col=%zu min_allowed=%zu ==> col=%zu\n",
            __func__, __LINE__, min_orig, intended_col, min_col, col);
+
    if (cpd.frag_cols > 0 && cpd.frag_cols <= col)
    {
       col -= cpd.frag_cols;
@@ -194,9 +200,10 @@ void align_right_comments(void)
    }
 
    chunk_t *pc = chunk_get_head();
+
    while (pc != nullptr)
    {
-      if (pc->flags & PCF_RIGHT_COMMENT)
+      if (pc->flags.test(PCF_RIGHT_COMMENT))
       {
          pc = align_trailing_comments(pc);
       }

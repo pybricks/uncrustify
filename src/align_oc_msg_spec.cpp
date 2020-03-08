@@ -8,6 +8,7 @@
  */
 
 #include "align_oc_msg_spec.h"
+
 #include "align_assign.h"
 #include "align_stack.h"
 
@@ -30,5 +31,6 @@ void align_oc_msg_spec(size_t span)
          as.Add(pc);
       }
    }
+
    as.End();
 } // void align_oc_msg_spec

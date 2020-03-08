@@ -8,8 +8,9 @@
  */
 
 #include "align_asm_colon.h"
-#include "chunk_list.h"
+
 #include "align_stack.h"
+#include "chunk_list.h"
 
 
 void align_asm_colon(void)
@@ -17,10 +18,11 @@ void align_asm_colon(void)
    LOG_FUNC_ENTRY();
 
    bool       did_nl;
-   AlignStack cas;   // for the colons
+   AlignStack cas; // for the colons
    cas.Start(4);
 
    chunk_t *pc = chunk_get_head();
+
    while (pc != nullptr)
    {
       if (pc->type != CT_ASM_COLON)
@@ -28,12 +30,12 @@ void align_asm_colon(void)
          pc = chunk_get_next(pc);
          continue;
       }
-
       cas.Reset();
 
       pc = chunk_get_next_ncnl(pc, scope_e::PREPROC);
       size_t level = pc ? pc->level : 0;
       did_nl = true;
+
       while (pc && pc->level >= level)
       {
          if (chunk_is_newline(pc))
