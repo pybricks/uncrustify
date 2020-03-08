@@ -1,12 +1,12 @@
 Source: uncrustify
 Section: devel
 Priority: optional
-Maintainer: Alexander GQ Gerasiov <gq@debian.org>
+Maintainer: Pybricks developers <dev@pybricks.com>
 Build-Depends: debhelper (>= 9), cmake, python-all
 Standards-Version: 4.1.2
 Homepage: https://github.com/uncrustify/uncrustify
-Vcs-Git: https://salsa.debian.org/debian/uncrustify.git
-Vcs-Browser: https://salsa.debian.org/debian/uncrustify
+Vcs-Git: https://github.com/pybricks/uncrustify.git
+Vcs-Browser: https://github.com/pybricks/uncrustify
 
 Package: uncrustify
 Architecture: any
