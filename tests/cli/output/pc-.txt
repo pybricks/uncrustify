@@ -2,5 +2,9 @@
 # option(s) with 'not default' value: 0
 #
 # -=====-
-# Line                Tag              Parent          Columns Br/Lvl/pp     Flag   Nl  Text
+# number of loops               = 0
+# -=====-
+# language                      = C
+# -=====-
+# Line                Tag         Parent_type  Type of the parent         Columns Br/Lvl/pp      Flag   Nl  Text
 # -=====-

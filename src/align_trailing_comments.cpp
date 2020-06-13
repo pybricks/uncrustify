@@ -12,6 +12,7 @@
 #include "align_add.h"
 #include "align_tab_column.h"
 #include "indent.h"
+#include "log_rules.h"
 #include "uncrustify.h"
 
 using namespace uncrustify;
@@ -20,6 +21,8 @@ using namespace uncrustify;
 void align_stack(ChunkStack &cs, size_t col, bool align_single, log_sev_t sev)
 {
    LOG_FUNC_ENTRY();
+
+   log_rule_B("align_on_tabstop");
 
    if (options::align_on_tabstop())
    {
@@ -48,15 +51,19 @@ void align_stack(ChunkStack &cs, size_t col, bool align_single, log_sev_t sev)
 chunk_t *align_trailing_comments(chunk_t *start)
 {
    LOG_FUNC_ENTRY();
-   size_t          min_col  = 0;
-   size_t          min_orig = 0;
-   chunk_t         *pc      = start;
-   const size_t    lvl      = start->brace_level;
-   size_t          nl_count = 0;
-   ChunkStack      cs;
-   size_t          col;
-   size_t          intended_col = options::align_right_cmt_at_col();
-   const bool      same_level   = options::align_right_cmt_same_level();
+   size_t       min_col  = 0;
+   size_t       min_orig = 0;
+   chunk_t      *pc      = start;
+   const size_t lvl      = start->brace_level;
+   size_t       nl_count = 0;
+   ChunkStack   cs;
+   size_t       col;
+
+   log_rule_B("align_right_cmt_at_col");
+   size_t intended_col = options::align_right_cmt_at_col();
+
+   log_rule_B("align_right_cmt_same_level");
+   const bool      same_level = options::align_right_cmt_same_level();
    comment_align_e cmt_type_cur;
    comment_align_e cmt_type_start = get_comment_align_type(pc);
 
@@ -64,6 +71,8 @@ chunk_t *align_trailing_comments(chunk_t *start)
            __func__, __LINE__, pc->orig_line);
 
    // Find the max column
+   log_rule_B("align_right_cmt_span");
+
    while (  pc != nullptr
          && (nl_count < options::align_right_cmt_span()))
    {
@@ -135,6 +144,8 @@ comment_align_e get_comment_align_type(chunk_t *cmt)
    chunk_t         *prev;
    comment_align_e cmt_type = comment_align_e::REGULAR;
 
+   log_rule_B("align_right_cmt_mix");
+
    if (  !options::align_right_cmt_mix()
       && ((prev = chunk_get_prev(cmt)) != nullptr))
    {
@@ -164,9 +175,11 @@ void align_right_comments(void)
          || chunk_is_token(pc, CT_COMMENT_CPP)
          || chunk_is_token(pc, CT_COMMENT_MULTI))
       {
-         if (pc->parent_type == CT_COMMENT_END)
+         if (get_chunk_parent_type(pc) == CT_COMMENT_END)
          {
             chunk_t *prev = chunk_get_prev(pc);
+
+            log_rule_B("align_right_cmt_gap");
 
             if (pc->orig_col < prev->orig_col_end + options::align_right_cmt_gap())
             {
@@ -183,8 +196,9 @@ void align_right_comments(void)
          }
 
          // Change certain WHOLE comments into RIGHT-alignable comments
-         if (pc->parent_type == CT_COMMENT_WHOLE)
+         if (get_chunk_parent_type(pc) == CT_COMMENT_WHOLE)
          {
+            log_rule_B("input_tab_size");
             size_t max_col = pc->column_indent + options::input_tab_size();
 
             // If the comment is further right than the brace level...

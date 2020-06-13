@@ -36,6 +36,7 @@ public:
    StarStyle  m_star_style;
    StarStyle  m_amp_style;  //! do not include the first item if it causes it to be indented
    bool       m_skip_first; //! do not include the first item if it causes it to be indented
+   //size_t     stackID;      // for debugging purpose only
 
 
    AlignStack()
@@ -47,9 +48,11 @@ public:
       , m_nl_seqnum(0)
       , m_gap(0)
       , m_right_align(false)
+      , m_absolute_thresh(false)
       , m_star_style(SS_IGNORE)
       , m_amp_style(SS_IGNORE)
       , m_skip_first(false)
+      //, stackID(1234)
       , m_last_added(0)
    {
    }
@@ -66,6 +69,7 @@ public:
       , m_nl_seqnum(ref.m_nl_seqnum)
       , m_gap(ref.m_gap)
       , m_right_align(ref.m_right_align)
+      , m_absolute_thresh(ref.m_absolute_thresh)
       , m_star_style(ref.m_star_style)
       , m_amp_style(ref.m_amp_style)
       , m_skip_first(ref.m_skip_first)
@@ -113,6 +117,17 @@ public:
 
    //! Aligns everything else and resets the lists.
    void End();
+
+
+   //! the size of the lists.
+   size_t Len();
+
+
+   //! for debuging purpose only
+   void Debug();
+
+
+   const char *get_StarStyle_name(StarStyle star_style);
 
 protected:
    size_t     m_last_added; //! 0=none, 1=aligned, 2=skipped

@@ -11,6 +11,7 @@
 
 #include "align_assign.h"
 #include "align_stack.h"
+#include "log_rules.h"
 #include "uncrustify.h"
 
 using namespace uncrustify;
@@ -33,18 +34,23 @@ chunk_t *align_assign(chunk_t *first, size_t span, size_t thresh, size_t *p_nl_c
 
    // If we are aligning on a tabstop, we shouldn't right-align
    AlignStack as;    // regular assigns
+
    as.Start(span, thresh);
+   log_rule_B("align_on_tabstop");
    as.m_right_align = !options::align_on_tabstop();
 
    AlignStack vdas;  // variable def assigns
+
    vdas.Start(span, thresh);
    vdas.m_right_align = as.m_right_align;
 
    std::deque<AlignStack> fcnDefault(1);
+
    fcnDefault.back().Start(span, thresh);
    fcnDefault.back().m_right_align = as.m_right_align;
 
    AlignStack fcnProto;
+
    fcnProto.Start(span, thresh);
    fcnProto.m_right_align = as.m_right_align;
 
@@ -57,7 +63,7 @@ chunk_t *align_assign(chunk_t *first, size_t span, size_t thresh, size_t *p_nl_c
    while (pc != nullptr)
    {
       LOG_FMT(LALASS, "%s(%d): orig_line is %zu, check pc->text() '%s', type is %s, parent_type is %s\n",
-              __func__, __LINE__, pc->orig_line, pc->text(), get_token_name(pc->type), get_token_name(pc->parent_type));
+              __func__, __LINE__, pc->orig_line, pc->text(), get_token_name(pc->type), get_token_name(get_chunk_parent_type(pc)));
 
       // Don't check inside SPAREN, PAREN or SQUARE groups
       if (  chunk_is_token(pc, CT_SPAREN_OPEN)
@@ -97,14 +103,18 @@ chunk_t *align_assign(chunk_t *first, size_t span, size_t thresh, size_t *p_nl_c
 
          size_t sub_nl_count = 0;
 
-         if (pc->parent_type == CT_ENUM)
+         if (get_chunk_parent_type(pc) == CT_ENUM)
          {
-            myspan   = options::align_enum_equ_span();
+            log_rule_B("align_enum_equ_span");
+            myspan = options::align_enum_equ_span();
+            log_rule_B("align_enum_equ_thresh");
             mythresh = options::align_enum_equ_thresh();
          }
          else
          {
-            myspan   = options::align_assign_span();
+            log_rule_B("align_assign_span");
+            myspan = options::align_assign_span();
+            log_rule_B("align_assign_thresh");
             mythresh = options::align_assign_thresh();
          }
          pc = align_assign(chunk_get_next_ncnl(pc), myspan, mythresh, &sub_nl_count);
@@ -186,6 +196,8 @@ chunk_t *align_assign(chunk_t *first, size_t span, size_t thresh, size_t *p_nl_c
          LOG_FMT(LALASS, "%s(%d): log_pcf_flags pc->flags: ", __func__, __LINE__);
          log_pcf_flags(LALASS, pc->flags);
 
+         log_rule_B("align_assign_decl_func");
+
          if (  options::align_assign_decl_func() == 0         // Align with other assignments (default)
             && (  chunk_is_token(pc, CT_ASSIGN_DEFAULT_ARG)   // Foo( int bar = 777 );
                || chunk_is_token(pc, CT_ASSIGN_FUNC_PROTO)))  // Foo( const Foo & ) = delete;
@@ -203,6 +215,8 @@ chunk_t *align_assign(chunk_t *first, size_t span, size_t thresh, size_t *p_nl_c
          }
          else if (options::align_assign_decl_func() == 1)   // Align with each other
          {
+            log_rule_B("align_assign_decl_func");
+
             if (chunk_is_token(pc, CT_ASSIGN_DEFAULT_ARG))  // Foo( int bar = 777 );
             {
                LOG_FMT(LALASS, "%s(%d): default: fcnDefault[%zu].Add on '%s' on orig_line %zu, orig_col is %zu\n",
@@ -233,6 +247,7 @@ chunk_t *align_assign(chunk_t *first, size_t span, size_t thresh, size_t *p_nl_c
                  && (  chunk_is_token(pc, CT_ASSIGN_DEFAULT_ARG)   // Foo( int bar = 777 );
                     || chunk_is_token(pc, CT_ASSIGN_FUNC_PROTO)))  // Foo( const Foo & ) = delete;
          {
+            log_rule_B("align_assign_decl_func");
             LOG_FMT(LALASS, "%s(%d): Don't align\n",               // Issue #2236
                     __func__, __LINE__);
          }

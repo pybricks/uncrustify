@@ -13,6 +13,7 @@
 #include "chunk_list.h"
 #include "ChunkStack.h"
 #include "indent.h"
+#include "log_rules.h"
 #include "uncrustify.h"
 
 using namespace uncrustify;
@@ -24,6 +25,7 @@ void align_left_shift(void)
 
    chunk_t    *start = nullptr;
    AlignStack as;
+
    as.Start(255);
 
    chunk_t *pc = chunk_get_head();
@@ -71,7 +73,7 @@ void align_left_shift(void)
               && !pc->flags.test(PCF_IN_TYPEDEF)
               && chunk_is_str(pc, "<<", 2))
       {
-         if (pc->parent_type == CT_OPERATOR)
+         if (get_chunk_parent_type(pc) == CT_OPERATOR)
          {
             // Ignore operator<<
          }
@@ -88,6 +90,7 @@ void align_left_shift(void)
 
             if (prev != nullptr && chunk_is_newline(prev))
             {
+               log_rule_B("indent_columns");
                indent_to_column(pc, pc->column_indent + options::indent_columns());
                pc->column_indent = pc->column;
                chunk_flags_set(pc, PCF_DONT_INDENT);
@@ -115,6 +118,7 @@ void align_left_shift(void)
 
          if (prev != nullptr && chunk_is_newline(prev))
          {
+            log_rule_B("indent_columns");
             indent_to_column(pc, pc->column_indent + options::indent_columns());
             pc->column_indent = pc->column;
             chunk_flags_set(pc, PCF_DONT_INDENT);

@@ -17,6 +17,7 @@
 #include "keywords.h"
 #include "lang_pawn.h"
 #include "language_tools.h"
+#include "log_rules.h"
 #include "logger.h"
 #include "prototypes.h"
 #include "unc_ctype.h"
@@ -268,7 +269,7 @@ static bool maybe_while_of_do(chunk_t *pc)
    }
 
    if (  (chunk_is_token(prev, CT_VBRACE_CLOSE) || chunk_is_token(prev, CT_BRACE_CLOSE))
-      && prev->parent_type == CT_DO)
+      && get_chunk_parent_type(prev) == CT_DO)
    {
       return(true);
    }
@@ -408,7 +409,8 @@ static void parse_cleanup(ParseFrame &frm, chunk_t *pc)
          cpd.consumed = true;
          close_statement(frm, pc);
       }
-      else if (language_is_set(LANG_PAWN) && chunk_is_token(pc, CT_BRACE_CLOSE))
+      else if (  language_is_set(LANG_PAWN)
+              && chunk_is_token(pc, CT_BRACE_CLOSE))
       {
          close_statement(frm, pc);
       }
@@ -479,7 +481,7 @@ static void parse_cleanup(ParseFrame &frm, chunk_t *pc)
          // Pop the entry
          LOG_FMT(LBCSPOP, "%s(%d): pc->orig_line is %zu, orig_col is %zu, text() is '%s', type is %s\n",
                  __func__, __LINE__, pc->orig_line, pc->orig_col, pc->text(), get_token_name(pc->type));
-         frm.pop();
+         frm.pop(__func__, __LINE__);
          print_stack(LBCSPOP, "-Close  ", frm);
 
          // See if we are in a complex statement
@@ -535,7 +537,7 @@ static void parse_cleanup(ParseFrame &frm, chunk_t *pc)
       }
    }
    // Get the parent type for brace and parenthesis open
-   c_token_t parent = pc->parent_type;
+   c_token_t parent = get_chunk_parent_type(pc);
 
    if (  chunk_is_token(pc, CT_PAREN_OPEN)
       || chunk_is_token(pc, CT_FPAREN_OPEN)
@@ -604,7 +606,7 @@ static void parse_cleanup(ParseFrame &frm, chunk_t *pc)
             // Carry through CT_ENUM parent in NS_ENUM (type, name) {
             else if (  chunk_is_token(prev, CT_FPAREN_CLOSE)
                     && language_is_set(LANG_OC)
-                    && prev->parent_type == CT_ENUM)
+                    && get_chunk_parent_type(prev) == CT_ENUM)
             {
                parent = CT_ENUM;
             }
@@ -631,21 +633,25 @@ static void parse_cleanup(ParseFrame &frm, chunk_t *pc)
    {
       frm.level++;
 
-      if (chunk_is_token(pc, CT_BRACE_OPEN) || chunk_is_token(pc, CT_MACRO_OPEN))
+      if (  chunk_is_token(pc, CT_BRACE_OPEN)
+         || chunk_is_token(pc, CT_MACRO_OPEN))
       {
          // Issue #1813
          bool single = false;
 
-         if (pc->parent_type == CT_NAMESPACE)
+         if (get_chunk_parent_type(pc) == CT_NAMESPACE)
          {
             LOG_FMT(LBCSPOP, "%s(%d): parent_type is NAMESPACE\n",
                     __func__, __LINE__);
             chunk_t *tmp = frm.top().pc;
 
-            if (tmp != nullptr && tmp->parent_type == CT_NAMESPACE)
+            if (tmp != nullptr && get_chunk_parent_type(tmp) == CT_NAMESPACE)
             {
                LOG_FMT(LBCSPOP, "%s(%d): tmp->parent_type is NAMESPACE\n",
                        __func__, __LINE__);
+
+               log_rule_B("indent_namespace");
+               log_rule_B("indent_namespace_single_indent");
 
                if (  options::indent_namespace()
                   && options::indent_namespace_single_indent())
@@ -657,7 +663,7 @@ static void parse_cleanup(ParseFrame &frm, chunk_t *pc)
             }
          }
          LOG_FMT(LBCSPOP, "%s(%d): pc->orig_line is %zu, orig_col is %zu, text() is '%s', type is %s, parent_type is %s\n",
-                 __func__, __LINE__, pc->orig_line, pc->orig_col, pc->text(), get_token_name(pc->type), get_token_name(pc->parent_type));
+                 __func__, __LINE__, pc->orig_line, pc->orig_col, pc->text(), get_token_name(pc->type), get_token_name(get_chunk_parent_type(pc)));
 
          if (!single)
          {
@@ -666,9 +672,60 @@ static void parse_cleanup(ParseFrame &frm, chunk_t *pc)
                     __func__, __LINE__, frm.brace_level);
          }
       }
-      frm.push(pc);
+      frm.push(pc, __func__, __LINE__);
       frm.top().parent = parent;
+      // set parent type
       set_chunk_parent(pc, parent);
+   }
+   // Issue #2281
+   LOG_FMT(LBCSPOP, "%s(%d):\n", __func__, __LINE__);
+
+   if (  chunk_is_token(pc, CT_BRACE_OPEN)
+      && pc->parent_type == CT_SWITCH)
+   {
+      size_t idx = frm.size();
+      LOG_FMT(LBCSPOP, "%s(%d): idx is %zu\n",
+              __func__, __LINE__, idx);
+      chunk_t *saved = frm.at(idx - 2).pc;
+
+      if (saved != nullptr)
+      {
+         // set parent member
+         chunk_set_parent(pc, saved);
+      }
+   }
+
+   if (chunk_is_token(pc, CT_CASE))
+   {
+      LOG_FMT(LBCSPOP, "%s(%d): pc->orig_line is %zu, pc->orig_col is %zu\n",
+              __func__, __LINE__, pc->orig_line, pc->orig_col);
+      set_chunk_parent(pc, CT_SWITCH);
+      size_t idx = frm.size();
+      LOG_FMT(LBCSPOP, "%s(%d): idx is %zu\n",
+              __func__, __LINE__, idx);
+      chunk_t *saved = frm.at(idx - 2).pc;
+
+      if (saved != nullptr)
+      {
+         // set parent member
+         chunk_set_parent(pc, saved);
+      }
+   }
+
+   if (chunk_is_token(pc, CT_BREAK))
+   {
+      LOG_FMT(LBCSPOP, "%s(%d): pc->orig_line is %zu, pc->orig_col is %zu\n",
+              __func__, __LINE__, pc->orig_line, pc->orig_col);
+      size_t idx = frm.size();
+      LOG_FMT(LBCSPOP, "%s(%d): idx is %zu\n",
+              __func__, __LINE__, idx);
+      chunk_t *saved = frm.at(idx - 2).pc;
+
+      if (saved != nullptr)
+      {
+         // set parent member
+         chunk_set_parent(pc, saved);
+      }
    }
    const pattern_class_e patcls = get_token_pattern_class(pc->type);
 
@@ -679,7 +736,7 @@ static void parse_cleanup(ParseFrame &frm, chunk_t *pc)
     */
    if (patcls == pattern_class_e::BRACED)
    {
-      frm.push(pc, (chunk_is_token(pc, CT_DO) ? brace_stage_e::BRACE_DO
+      frm.push(pc, __func__, __LINE__, (chunk_is_token(pc, CT_DO) ? brace_stage_e::BRACE_DO
                     : brace_stage_e::BRACE2));
       // "+ComplexBraced"
    }
@@ -692,17 +749,17 @@ static void parse_cleanup(ParseFrame &frm, chunk_t *pc)
          set_chunk_type(pc, CT_WHILE_OF_DO);
          bs = brace_stage_e::WOD_PAREN;
       }
-      frm.push(pc, bs);
+      frm.push(pc, __func__, __LINE__, bs);
       // "+ComplexParenBraced"
    }
    else if (patcls == pattern_class_e::OPBRACED)
    {
-      frm.push(pc, brace_stage_e::OP_PAREN1);
+      frm.push(pc, __func__, __LINE__, brace_stage_e::OP_PAREN1);
       // "+ComplexOpParenBraced");
    }
    else if (patcls == pattern_class_e::ELSE)
    {
-      frm.push(pc, brace_stage_e::ELSEIF);
+      frm.push(pc, __func__, __LINE__, brace_stage_e::ELSEIF);
       // "+ComplexElse");
    }
 
@@ -713,10 +770,10 @@ static void parse_cleanup(ParseFrame &frm, chunk_t *pc)
     *  - after '(' that has a parent type of CT_FOR
     */
    if (  chunk_is_token(pc, CT_SQUARE_OPEN)
-      || (chunk_is_token(pc, CT_BRACE_OPEN) && pc->parent_type != CT_ASSIGN)
+      || (chunk_is_token(pc, CT_BRACE_OPEN) && get_chunk_parent_type(pc) != CT_ASSIGN)
       || chunk_is_token(pc, CT_BRACE_CLOSE)
       || chunk_is_token(pc, CT_VBRACE_CLOSE)
-      || (chunk_is_token(pc, CT_SPAREN_OPEN) && pc->parent_type == CT_FOR)
+      || (chunk_is_token(pc, CT_SPAREN_OPEN) && get_chunk_parent_type(pc) == CT_FOR)
       || chunk_is_token(pc, CT_COLON)
       || chunk_is_token(pc, CT_OC_END)
       || (  chunk_is_semicolon(pc)
@@ -779,6 +836,8 @@ static void parse_cleanup(ParseFrame &frm, chunk_t *pc)
          LOG_FMT(LERR, "%s(%d): Unmatched BRACE_CLOSE\n   orig_line is %zu, orig_col is %zu\n",
                  __func__, __LINE__, pc->orig_line, pc->orig_col);
 
+         log_rule_B("tok_split_gte");
+
          if (!options::tok_split_gte())
          {
             LOG_FMT(LERR, "%s(%d): Try the option 'tok_split_gte = true'\n",
@@ -817,7 +876,7 @@ static bool check_complex_statements(ParseFrame &frm, chunk_t *pc)
       // Remove the CT_IF and close the statement
       LOG_FMT(LBCSPOP, "%s(%d): pc->orig_line is %zu, orig_col is %zu, text() is '%s', type is %s\n",
               __func__, __LINE__, pc->orig_line, pc->orig_col, pc->text(), get_token_name(pc->type));
-      frm.pop();
+      frm.pop(__func__, __LINE__);
       print_stack(LBCSPOP, "-IF-CCS ", frm);
 
       if (close_statement(frm, pc))
@@ -829,6 +888,8 @@ static bool check_complex_statements(ParseFrame &frm, chunk_t *pc)
    // Check for CT_IF after CT_ELSE
    if (frm.top().stage == brace_stage_e::ELSEIF)
    {
+      log_rule_B("indent_else_if");
+
       if (  chunk_is_token(pc, CT_IF)
          && (  !options::indent_else_if()
             || !chunk_is_newline(chunk_get_prev_nc(pc))))
@@ -869,7 +930,7 @@ static bool check_complex_statements(ParseFrame &frm, chunk_t *pc)
       // Remove the CT_TRY and close the statement
       LOG_FMT(LBCSPOP, "%s(%d): pc->orig_line is %zu, orig_col is %zu, text() is '%s', type is %s\n",
               __func__, __LINE__, pc->orig_line, pc->orig_col, pc->text(), get_token_name(pc->type));
-      frm.pop();
+      frm.pop(__func__, __LINE__);
       print_stack(LBCSPOP, "-TRY-CCS ", frm);
 
       if (close_statement(frm, pc))
@@ -923,7 +984,7 @@ static bool check_complex_statements(ParseFrame &frm, chunk_t *pc)
               pc->text());
       LOG_FMT(LBCSPOP, "%s(%d): pc->orig_line is %zu, orig_col is %zu, text() is '%s', type is %s\n",
               __func__, __LINE__, pc->orig_line, pc->orig_col, pc->text(), get_token_name(pc->type));
-      frm.pop();
+      frm.pop(__func__, __LINE__);
       print_stack(LBCSPOP, "-Error  ", frm);
       cpd.error_count++;
    }
@@ -935,6 +996,8 @@ static bool check_complex_statements(ParseFrame &frm, chunk_t *pc)
       && (  (frm.top().stage == brace_stage_e::BRACE2)
          || (frm.top().stage == brace_stage_e::BRACE_DO)))
    {
+      log_rule_B("indent_using_block");
+
       if (  language_is_set(LANG_CS)
          && chunk_is_token(pc, CT_USING_STMT)
          && (!options::indent_using_block()))
@@ -954,7 +1017,7 @@ static bool check_complex_statements(ParseFrame &frm, chunk_t *pc)
                  __func__, __LINE__, frm.brace_level);
          log_pcf_flags(LBCSPOP, pc->flags);
 
-         frm.push(vbrace, brace_stage_e::NONE);
+         frm.push(vbrace, __func__, __LINE__, brace_stage_e::NONE);
          // "+VBrace");
 
          frm.top().parent = parent;
@@ -997,7 +1060,7 @@ static bool check_complex_statements(ParseFrame &frm, chunk_t *pc)
       // Throw out the complex statement
       LOG_FMT(LBCSPOP, "%s(%d): pc->orig_line is %zu, orig_col is %zu, text() is '%s', type is %s\n",
               __func__, __LINE__, pc->orig_line, pc->orig_col, pc->text(), get_token_name(pc->type));
-      frm.pop();
+      frm.pop(__func__, __LINE__);
       print_stack(LBCSPOP, "-Error  ", frm);
       cpd.error_count++;
    }
@@ -1036,7 +1099,7 @@ static bool handle_complex_close(ParseFrame &frm, chunk_t *pc)
          {
             LOG_FMT(LBCSPOP, "%s(%d): no CT_ELSE, pc->orig_line is %zu, orig_col is %zu, text() is '%s', type is %s\n",
                     __func__, __LINE__, pc->orig_line, pc->orig_col, pc->text(), get_token_name(pc->type));
-            frm.pop();
+            frm.pop(__func__, __LINE__);
             print_stack(LBCSPOP, "-IF-HCS ", frm);
 
             return(close_statement(frm, pc));
@@ -1056,7 +1119,7 @@ static bool handle_complex_close(ParseFrame &frm, chunk_t *pc)
          {
             LOG_FMT(LBCSPOP, "%s(%d): pc->orig_line is %zu, orig_col is %zu, text() is '%s', type is %s\n",
                     __func__, __LINE__, pc->orig_line, pc->orig_col, pc->text(), get_token_name(pc->type));
-            frm.pop();
+            frm.pop(__func__, __LINE__);
             print_stack(LBCSPOP, "-TRY-HCS ", frm);
 
             return(close_statement(frm, pc));
@@ -1068,7 +1131,7 @@ static bool handle_complex_close(ParseFrame &frm, chunk_t *pc)
                  __func__, __LINE__, get_token_name(frm.top().type));
          LOG_FMT(LBCSPOP, "%s(%d): pc->orig_line is %zu, orig_col is %zu, text() is '%s', type is %s\n",
                  __func__, __LINE__, pc->orig_line, pc->orig_col, pc->text(), get_token_name(pc->type));
-         frm.pop();
+         frm.pop(__func__, __LINE__);
          print_stack(LBCSPOP, "-HCC B2 ", frm);
 
          return(close_statement(frm, pc));
@@ -1091,7 +1154,7 @@ static bool handle_complex_close(ParseFrame &frm, chunk_t *pc)
               __func__, __LINE__, get_token_name(frm.top().type));
       LOG_FMT(LBCSPOP, "%s(%d): pc->orig_line is %zu, orig_col is %zu, text() is '%s', type is %s\n",
               __func__, __LINE__, pc->orig_line, pc->orig_col, pc->text(), get_token_name(pc->type));
-      frm.pop();
+      frm.pop(__func__, __LINE__);
       print_stack(LBCSPOP, "-HCC WoDS ", frm);
 
       return(close_statement(frm, pc));
@@ -1142,6 +1205,7 @@ static void mark_namespace(chunk_t *pns)
          pc = chunk_get_next_ncnl(pc);
          continue;
       }
+      log_rule_B("indent_namespace_limit");
 
       if (  (options::indent_namespace_limit() > 0)
          && ((br_close = chunk_skip_to_match(pc)) != nullptr))
@@ -1152,6 +1216,8 @@ static void mark_namespace(chunk_t *pns)
                  __func__, __LINE__, br_close->orig_line, pc->orig_line);
          LOG_FMT(LTOK, "%s(%d): numberOfLines is %zu, indent_namespace_limit() is %d\n",
                  __func__, __LINE__, numberOfLines, options::indent_namespace_limit());
+
+         log_rule_B("indent_namespace_limit");
 
          if (numberOfLines > options::indent_namespace_limit())
          {
@@ -1171,8 +1237,9 @@ static chunk_t *insert_vbrace(chunk_t *pc, bool after, const ParseFrame &frm)
    LOG_FUNC_ENTRY();
 
    chunk_t chunk;
+
+   set_chunk_parent(&chunk, frm.top().type);
    chunk.orig_line   = pc->orig_line;
-   chunk.parent_type = frm.top().type;
    chunk.level       = frm.level;
    chunk.brace_level = frm.brace_level;
    chunk.flags       = pc->flags & PCF_COPY_FLAGS;
@@ -1181,7 +1248,7 @@ static chunk_t *insert_vbrace(chunk_t *pc, bool after, const ParseFrame &frm)
    if (after)
    {
       chunk.orig_col = pc->orig_col;
-      chunk.type     = CT_VBRACE_CLOSE;
+      set_chunk_type(&chunk, CT_VBRACE_CLOSE);
       return(chunk_add_after(&chunk, pc));
    }
    chunk_t *ref = chunk_get_prev(pc);
@@ -1232,7 +1299,7 @@ static chunk_t *insert_vbrace(chunk_t *pc, bool after, const ParseFrame &frm)
    chunk.orig_line = ref->orig_line;
    chunk.orig_col  = ref->orig_col;
    chunk.column    = ref->column + ref->len() + 1;
-   chunk.type      = CT_VBRACE_OPEN;
+   set_chunk_type(&chunk, CT_VBRACE_OPEN);
 
    return(chunk_add_after(&chunk, ref));
 } // insert_vbrace
@@ -1287,7 +1354,7 @@ bool close_statement(ParseFrame &frm, chunk_t *pc)
          log_pcf_flags(LBCSPOP, pc->flags);
          LOG_FMT(LBCSPOP, "%s(%d): pc->orig_line is %zu, orig_col is %zu, text() is '%s', type is %s\n",
                  __func__, __LINE__, pc->orig_line, pc->orig_col, pc->text(), get_token_name(pc->type));
-         frm.pop();
+         frm.pop(__func__, __LINE__);
 
          // Update the token level
          pc->level       = frm.level;

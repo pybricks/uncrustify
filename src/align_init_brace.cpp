@@ -13,6 +13,7 @@
 #include "align_tools.h"
 #include "chunk_list.h"
 #include "indent.h"
+#include "log_rules.h"
 #include "uncrustify.h"
 
 using namespace uncrustify;
@@ -34,7 +35,7 @@ void align_init_brace(chunk_t *start)
    chunk_t *pcSingle = scan_ib_line(pc, true);
 
    if (  pcSingle == nullptr
-      || (chunk_is_token(pcSingle, CT_BRACE_CLOSE) && pcSingle->parent_type == CT_ASSIGN))
+      || (chunk_is_token(pcSingle, CT_BRACE_CLOSE) && get_chunk_parent_type(pcSingle) == CT_ASSIGN))
    {
       // single line - nothing to do
       LOG_FMT(LALBR, "%s(%d): single line - nothing to do\n", __func__, __LINE__);
@@ -59,6 +60,8 @@ void align_init_brace(chunk_t *start)
 
    // debug dump the current frame
    align_log_al(LALBR, start->orig_line);
+
+   log_rule_B("align_on_tabstop");
 
    if (  options::align_on_tabstop()
       && cpd.al_cnt >= 1
@@ -128,6 +131,8 @@ void align_init_brace(chunk_t *start)
                   //        next->orig_line,
                   //        next->text(), cpd.al[idx].col, cpd.al[idx].len);
 
+                  log_rule_B("align_number_right");
+
                   if (  (idx < (cpd.al_cnt - 1))
                      && options::align_number_right()
                      && (  chunk_is_token(next, CT_NUMBER_FP)
@@ -156,6 +161,8 @@ void align_init_brace(chunk_t *start)
                chunk_flags_set(pc, PCF_WAS_ALIGNED);
 
                // see if we need to right-align a number
+               log_rule_B("align_number_right");
+
                if (  (idx < (cpd.al_cnt - 1))
                   && options::align_number_right())
                {

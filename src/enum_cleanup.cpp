@@ -9,6 +9,7 @@
 #include "enum_cleanup.h"
 
 #include "chunk_list.h"
+#include "log_rules.h"
 #include "logger.h"
 #include "uncrustify.h"
 #include "uncrustify_types.h"
@@ -20,6 +21,8 @@ void enum_cleanup(void)
 {
    LOG_FUNC_ENTRY();
 
+   log_rule_B("mod_enum_last_comma");
+
    if (options::mod_enum_last_comma() == IARF_IGNORE)
    {
       // nothing to do
@@ -29,7 +32,7 @@ void enum_cleanup(void)
 
    while (pc != nullptr)
    {
-      if (  pc->parent_type == CT_ENUM
+      if (  get_chunk_parent_type(pc) == CT_ENUM
          && chunk_is_token(pc, CT_BRACE_CLOSE))
       {
          LOG_FMT(LTOK, "%s(%d): orig_line is %zu, type is %s\n",
@@ -39,6 +42,8 @@ void enum_cleanup(void)
          // test of (prev == nullptr) is not necessary
          if (chunk_is_token(prev, CT_COMMA))
          {
+            log_rule_B("mod_enum_last_comma");
+
             if (options::mod_enum_last_comma() == IARF_REMOVE)
             {
                chunk_del(prev);
@@ -46,16 +51,18 @@ void enum_cleanup(void)
          }
          else
          {
+            log_rule_B("mod_enum_last_comma");
+
             if (  options::mod_enum_last_comma() == IARF_ADD
                || options::mod_enum_last_comma() == IARF_FORCE)
             {
                // create a comma
                chunk_t comma;
+               set_chunk_type(&comma, CT_COMMA);
                comma.orig_line = prev->orig_line;
                comma.orig_col  = prev->orig_col + 1;
                comma.nl_count  = 0;
                comma.flags     = PCF_NONE;
-               comma.type      = CT_COMMA;
                comma.str       = ",";
                chunk_add_after(&comma, prev);
             }

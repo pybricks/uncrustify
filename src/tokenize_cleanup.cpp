@@ -16,9 +16,11 @@
 #include "char_table.h"
 #include "chunk_list.h"
 #include "combine.h"
+#include "combine_skip.h"
 #include "error_types.h"
 #include "keywords.h"
 #include "language_tools.h"
+#include "log_rules.h"
 #include "prototypes.h"
 #include "punctuators.h"
 #include "space.h"
@@ -57,7 +59,7 @@ static void check_template_args(chunk_t *start, chunk_t *end);
  *
  * @param start  chunk to start check at
  */
-static void check_template(chunk_t *start);
+static void check_template(chunk_t *start, bool in_type_cast);
 
 
 /**
@@ -98,9 +100,9 @@ static chunk_t *handle_double_angle_close(chunk_t *pc)
    {
       if (  chunk_is_token(pc, CT_ANGLE_CLOSE)
          && chunk_is_token(next, CT_ANGLE_CLOSE)
-         && pc->parent_type == CT_NONE
+         && get_chunk_parent_type(pc) == CT_NONE
          && (pc->orig_col_end + 1) == next->orig_col
-         && next->parent_type == CT_NONE)
+         && get_chunk_parent_type(next) == CT_NONE)
       {
          pc->str.append('>');
          set_chunk_type(pc, CT_ARITH);
@@ -129,11 +131,12 @@ void split_off_angle_close(chunk_t *pc)
       return;
    }
    chunk_t nc = *pc;
+
    pc->str.resize(1);
    pc->orig_col_end = pc->orig_col + 1;
    set_chunk_type(pc, CT_ANGLE_CLOSE);
 
-   nc.type = ct->type;
+   set_chunk_type(&nc, ct->type);
    nc.str.pop_front();
    nc.orig_col++;
    nc.column++;
@@ -258,7 +261,7 @@ void tokenize_trailing_return_types(void)
          }
 
          if (  chunk_is_token(tmp, CT_FPAREN_CLOSE)
-            && tmp->parent_type == CT_FUNC_PROTO)
+            && (get_chunk_parent_type(tmp) == CT_FUNC_PROTO || get_chunk_parent_type(tmp) == CT_FUNC_DEF))
          {
             set_chunk_type(pc, CT_TRAILING_RET);
             LOG_FMT(LNOTE, "%s(%d): set trailing return type for text() is '%s'\n",
@@ -394,23 +397,25 @@ void tokenize_cleanup(void)
       }
 
       if (  chunk_is_token(pc, CT_ENUM)
-         && chunk_is_token(next, CT_CLASS))
+         && (chunk_is_token(next, CT_STRUCT) || chunk_is_token(next, CT_CLASS)))
       {
          set_chunk_type(next, CT_ENUM_CLASS);
       }
+      chunk_t *next_non_attr = language_is_set(LANG_CPP) ? skip_attribute_next(next) : next;
 
       /*
-       * Change CT_WORD after CT_ENUM, CT_UNION, or CT_STRUCT to CT_TYPE
+       * Change CT_WORD after CT_ENUM, CT_UNION, CT_STRUCT, or CT_CLASS to CT_TYPE
        * Change CT_WORD before CT_WORD to CT_TYPE
        */
-      if (chunk_is_token(next, CT_WORD))
+      if (chunk_is_token(next_non_attr, CT_WORD))
       {
          if (  chunk_is_token(pc, CT_ENUM)
             || chunk_is_token(pc, CT_ENUM_CLASS)
             || chunk_is_token(pc, CT_UNION)
-            || chunk_is_token(pc, CT_STRUCT))
+            || chunk_is_token(pc, CT_STRUCT)
+            || chunk_is_token(pc, CT_CLASS))
          {
-            set_chunk_type(next, CT_TYPE);
+            set_chunk_type(next_non_attr, CT_TYPE);
          }
 
          if (chunk_is_token(pc, CT_WORD))
@@ -471,7 +476,8 @@ void tokenize_cleanup(void)
       }
 
       // Change angle open/close to CT_COMPARE, if not a template thingy
-      if (chunk_is_token(pc, CT_ANGLE_OPEN) && pc->parent_type != CT_TYPE_CAST)
+      if (  chunk_is_token(pc, CT_ANGLE_OPEN)
+         && pc->parent_type != CT_TYPE_CAST)
       {
          /*
           * pretty much all languages except C use <> for something other than
@@ -480,7 +486,7 @@ void tokenize_cleanup(void)
          if (language_is_set(LANG_OC | LANG_CPP | LANG_CS | LANG_JAVA | LANG_VALA))
          {
             // bug #663
-            check_template(pc);
+            check_template(pc, in_type_cast);
          }
          else
          {
@@ -489,7 +495,8 @@ void tokenize_cleanup(void)
          }
       }
 
-      if (chunk_is_token(pc, CT_ANGLE_CLOSE) && pc->parent_type != CT_TEMPLATE)
+      if (  chunk_is_token(pc, CT_ANGLE_CLOSE)
+         && pc->parent_type != CT_TEMPLATE)
       {
          if (in_type_cast)
          {
@@ -584,7 +591,8 @@ void tokenize_cleanup(void)
       if (  chunk_is_token(pc, CT_CLASS)
          && !CharTable::IsKw1(next->str[0]))
       {
-         if (chunk_is_not_token(next, CT_DC_MEMBER))
+         if (  chunk_is_not_token(next, CT_DC_MEMBER)
+            && chunk_is_not_token(next, CT_ATTRIBUTE))                       // Issue #2570
          {
             set_chunk_type(pc, CT_WORD);
          }
@@ -758,7 +766,7 @@ void tokenize_cleanup(void)
                   pc->str.resize(1);
                   pc->orig_col_end = pc->orig_col + 1;
 
-                  nc.type = CT_SQL_WORD;
+                  set_chunk_type(&nc, CT_SQL_WORD);
                   nc.str.pop_front();
                   nc.orig_col++;
                   nc.column++;
@@ -923,12 +931,12 @@ void tokenize_cleanup(void)
        *   @interface ClassName ()
        *   @implementation ClassName ()
        */
-      if (  (  pc->parent_type == CT_OC_IMPL
-            || pc->parent_type == CT_OC_INTF
+      if (  (  get_chunk_parent_type(pc) == CT_OC_IMPL
+            || get_chunk_parent_type(pc) == CT_OC_INTF
             || chunk_is_token(pc, CT_OC_CLASS))
          && chunk_is_token(next, CT_PAREN_OPEN))
       {
-         set_chunk_parent(next, pc->parent_type);
+         set_chunk_parent(next, get_chunk_parent_type(pc));
 
          chunk_t *tmp = chunk_get_next(next);
 
@@ -937,19 +945,19 @@ void tokenize_cleanup(void)
             if (chunk_is_token(tmp, CT_PAREN_CLOSE))
             {
                //set_chunk_type(tmp, CT_OC_CLASS_EXT);
-               set_chunk_parent(tmp, pc->parent_type);
+               set_chunk_parent(tmp, get_chunk_parent_type(pc));
             }
             else
             {
                set_chunk_type(tmp, CT_OC_CATEGORY);
-               set_chunk_parent(tmp, pc->parent_type);
+               set_chunk_parent(tmp, get_chunk_parent_type(pc));
             }
          }
          tmp = chunk_get_next_type(pc, CT_PAREN_CLOSE, pc->level);
 
          if (tmp != nullptr)
          {
-            set_chunk_parent(tmp, pc->parent_type);
+            set_chunk_parent(tmp, get_chunk_parent_type(pc));
          }
       }
 
@@ -1093,7 +1101,7 @@ void tokenize_cleanup(void)
 } // tokenize_cleanup
 
 
-static void check_template(chunk_t *start)
+static void check_template(chunk_t *start, bool in_type_cast)
 {
    LOG_FMT(LTEMPL, "%s(%d): orig_line %zu, orig_col %zu:\n",
            __func__, __LINE__, start->orig_line, start->orig_col);
@@ -1124,9 +1132,17 @@ static void check_template(chunk_t *start)
 
          if ((pc->str[0] == '>') && (pc->len() > 1))
          {
-            LOG_FMT(LTEMPL, "%s(%d): {split '%s' at orig_line %zu, orig_col %zu}\n",
-                    __func__, __LINE__, pc->text(), pc->orig_line, pc->orig_col);
-            split_off_angle_close(pc);
+            if (pc->str[1] == '=')                         // Issue #1462 and #2565
+            {
+               LOG_FMT(LTEMPL, "%s(%d): do not split '%s' at orig_line %zu, orig_col %zu\n",
+                       __func__, __LINE__, pc->text(), pc->orig_line, pc->orig_col);
+            }
+            else
+            {
+               LOG_FMT(LTEMPL, "%s(%d): {split '%s' at orig_line %zu, orig_col %zu}\n",
+                       __func__, __LINE__, pc->text(), pc->orig_line, pc->orig_col);
+               split_off_angle_close(pc);
+            }
          }
 
          if (pc->type == CT_PAREN_OPEN)
@@ -1181,7 +1197,7 @@ static void check_template(chunk_t *start)
          && prev->type != CT_COMMA
          && prev->type != CT_QUALIFIER
          && prev->type != CT_OPERATOR_VAL
-         && prev->parent_type != CT_OPERATOR)
+         && get_chunk_parent_type(prev) != CT_OPERATOR)
       {
          LOG_FMT(LTEMPL, "%s(%d): - after type %s + ( - Not a template\n",
                  __func__, __LINE__, get_token_name(prev->type));
@@ -1238,12 +1254,14 @@ static void check_template(chunk_t *start)
          LOG_FMT(LTEMPL, "%s(%d): type is %s, num_tokens is %zu\n",
                  __func__, __LINE__, get_token_name(pc->type), num_tokens);
 
+         log_rule_B("tok_split_gte");
+
          if (  (tokens[num_tokens - 1] == CT_ANGLE_OPEN)
             && (pc->str[0] == '>')
             && (pc->len() > 1)
             && (  options::tok_split_gte()
                || (  (chunk_is_str(pc, ">>", 2) || chunk_is_str(pc, ">>>", 3))
-                  && num_tokens >= 2)))
+                  && (num_tokens >= 2 || (num_tokens >= 1 && in_type_cast)))))
          {
             LOG_FMT(LTEMPL, "%s(%d): {split '%s' at orig_line %zu, orig_col %zu}\n",
                     __func__, __LINE__, pc->text(), pc->orig_line, pc->orig_col);
@@ -1516,7 +1534,7 @@ static void mark_selectors_in_property_with_open_paren(chunk_t *open_paren)
          {
             if (chunk_is_token(tmp, CT_WORD) || chunk_is_str(tmp, ":", 1))
             {
-               tmp->type = CT_OC_SEL_NAME;
+               set_chunk_type(tmp, CT_OC_SEL_NAME);
             }
             tmp = tmp->next;
          }
@@ -1540,7 +1558,7 @@ static void mark_attributes_in_property_with_open_paren(chunk_t *open_paren)
       if (  (chunk_is_token(tmp, CT_COMMA) || chunk_is_token(tmp, CT_PAREN_OPEN))
          && (chunk_is_token(tmp->next, CT_WORD) || chunk_is_token(tmp->next, CT_TYPE)))
       {
-         tmp->next->type = CT_OC_PROPERTY_ATTR;
+         set_chunk_type(tmp->next, CT_OC_PROPERTY_ATTR);
       }
       tmp = tmp->next;
    }

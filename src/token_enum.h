@@ -7,6 +7,7 @@
  *          October 2015
  * @license GPL v2+
  */
+
 #ifndef TOKEN_ENUM_H_INCLUDED
 #define TOKEN_ENUM_H_INCLUDED
 
@@ -27,6 +28,7 @@
 enum c_token_t
 {
    CT_NONE,
+   CT_PARENT_NOT_SET,
    CT_EOF,
    CT_UNKNOWN,
 
@@ -36,6 +38,7 @@ enum c_token_t
    CT_SPACE,         // a fixed number of spaces to support weird spacing rules
    CT_NEWLINE,       // CRA, one or more newlines
    CT_NL_CONT,       // CRA, backslash-newline
+   CT_FORM_FEED,     // character 12
    CT_COMMENT_CPP,   // C++ comment (always followed by CT_NEWLINE)
    CT_COMMENT,       // C-comment, single line
    CT_COMMENT_MULTI, // Multi-lined comment
@@ -204,6 +207,9 @@ enum c_token_t
    CT_SPAREN_OPEN,      // 'special' paren after if/for/switch/while/synchronized/catch
    CT_SPAREN_CLOSE,
 
+   CT_PPAREN_OPEN,      // 'protect' paren to protect a type such as (*int)
+   CT_PPAREN_CLOSE,     // used at align_func_param
+
    CT_FPAREN_OPEN,      // 'function' paren after fcn/macro fcn
    CT_FPAREN_CLOSE,
 
@@ -226,35 +232,36 @@ enum c_token_t
    CT_MACRO_ELSE,
 
    // aggregate types
-   CT_LABEL,            // a non-case label
-   CT_LABEL_COLON,      // the colon for a label
-   CT_FUNCTION,         // function - unspecified, call mark_function()
-   CT_FUNC_CALL,        // function call
-   CT_FUNC_CALL_USER,   // function call (special user)
-   CT_FUNC_DEF,         // function definition/implementation
-   CT_FUNC_TYPE,        // function type - foo in "typedef void (*foo)(void)"
-   CT_FUNC_VAR,         // foo and parent type of first parens in "void (*foo)(void)"
-   CT_FUNC_PROTO,       // function prototype
-   CT_FUNC_START,       // global DC member for functions(void ::func())
-   CT_FUNC_CLASS_DEF,   // ctor or dtor for a class
-   CT_FUNC_CLASS_PROTO, // ctor or dtor for a class
-   CT_FUNC_CTOR_VAR,    // variable or class initialization
-   CT_FUNC_WRAP,        // macro that wraps the function name
-   CT_PROTO_WRAP,       // macro: "RETVAL PROTO_WRAP( fcn_name, (PARAMS))". Parens for PARAMS are optional.
-   CT_MACRO_FUNC,       // function-like macro
-   CT_MACRO,            // a macro def
-   CT_QUALIFIER,        // static, const, etc
-   CT_EXTERN,           // extern
-   CT_DECLSPEC,         // __declspec
-   CT_ALIGN,            // paren'd qualifier: align(4) struct a { }
+   CT_LABEL,              // a non-case label
+   CT_LABEL_COLON,        // the colon for a label
+   CT_FUNCTION,           // function - unspecified, call mark_function()
+   CT_FUNC_CALL,          // function call
+   CT_FUNC_CALL_USER,     // function call (special user)
+   CT_FUNC_DEF,           // function definition/implementation
+   CT_FUNC_TYPE,          // function type - foo in "typedef void (*foo)(void)"
+   CT_FUNC_VAR,           // foo and parent type of first parens in "void (*foo)(void)"
+   CT_FUNC_PROTO,         // function prototype
+   CT_FUNC_START,         // global DC member for functions(void ::func())
+   CT_FUNC_CLASS_DEF,     // ctor or dtor for a class
+   CT_FUNC_CLASS_PROTO,   // ctor or dtor for a class
+   CT_FUNC_CTOR_VAR,      // variable or class initialization
+   CT_FUNC_WRAP,          // macro that wraps the function name
+   CT_PROTO_WRAP,         // macro: "RETVAL PROTO_WRAP( fcn_name, (PARAMS))". Parens for PARAMS are optional.
+   CT_MACRO_FUNC,         // function-like macro
+   CT_MACRO,              // a macro def
+   CT_QUALIFIER,          // static, const, etc
+   CT_EXTERN,             // extern
+   CT_DECLSPEC,           // __declspec
+   CT_ALIGN,              // paren'd qualifier: align(4) struct a { }
    CT_TYPE,
-   CT_PTR_TYPE,         // a '*' as part of a type
-   CT_TYPE_WRAP,        // macro that wraps a type name
-   CT_CPP_LAMBDA,       // parent for '[=](...){...}'
-   CT_CPP_LAMBDA_RET,   // '->' in '[=](...) -> type {...}'
-   CT_TRAILING_RET,     // '->' in 'auto fname(...) -> type;'
-                        // '->' in 'auto fname(...) const -> type;'
-   CT_BIT_COLON,        // a ':' in a variable declaration
+   CT_PTR_TYPE,           // a '*' as part of a type
+   CT_TYPE_WRAP,          // macro that wraps a type name
+   CT_CPP_LAMBDA,         // parent for '[=](...){...}'
+   CT_CPP_LAMBDA_RET,     // '->' in '[=](...) -> type {...}'
+   CT_EXECUTION_CONTEXT,  // Keyword for use in lambda statement: [] CT_EXECUTION_CONTEXT ()->{}
+   CT_TRAILING_RET,       // '->' in 'auto fname(...) -> type;'
+                          // '->' in 'auto fname(...) const -> type;'
+   CT_BIT_COLON,          // a ':' in a variable declaration
 
    CT_OC_DYNAMIC,
    CT_OC_END,           // ObjC: @end
