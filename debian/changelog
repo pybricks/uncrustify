@@ -1,3 +1,9 @@
+uncrustify (0.71.0-0pybricks1) bionic; urgency=medium
+
+  * New upstream version 0.71.0
+
+ -- David Lechner <david@lechnology.com>  Sat, 13 Jun 2020 11:18:44 -0500
+
 uncrustify (0.70.1-0pybricks1) bionic; urgency=medium
 
   * New upstream version 0.70.1
