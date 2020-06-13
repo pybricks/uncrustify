@@ -5,6 +5,7 @@
  * @author  Ben Gardner
  * @license GPL v2+
  */
+
 #ifndef CHUNK_LIST_H_INCLUDED
 #define CHUNK_LIST_H_INCLUDED
 
@@ -40,9 +41,6 @@ enum class scope_e : unsigned int
    ALL,      //! search in all kind of chunks
    PREPROC,  //! search only in preprocessor chunks
 };
-
-
-void set_chunk_real(chunk_t *pc, c_token_t token, log_sev_t what);
 
 
 /**
@@ -90,7 +88,12 @@ chunk_t *chunk_add_before(const chunk_t *pc_in, chunk_t *ref);
  *
  * @param pc  chunk to delete
  */
-void chunk_del(chunk_t *pc);
+#define chunk_del(pc)    do { \
+      chunk_del_2((pc));      \
+      (pc) = nullptr;         \
+} while (false)
+
+void chunk_del_2(chunk_t *pc);
 
 
 /**
@@ -416,6 +419,16 @@ chunk_t *chunk_get_next_ssq(chunk_t *cur);
  * @return nullptr or the prev chunk not in or part of square brackets
  */
 chunk_t *chunk_get_prev_ssq(chunk_t *cur);
+
+/**
+ * Gets the corresponding start chunk if the given chunk is within a
+ * preprocessor directive, or nullptr otherwise.
+ *
+ * @param  cur    chunk to use as start point
+ *
+ * @return nullptr or start chunk of the preprocessor directive
+ */
+chunk_t *chunk_get_pp_start(chunk_t *cur);
 
 /**
  * @brief reverse search a chunk of a given category in a chunk list
@@ -855,40 +868,44 @@ static inline bool chunk_is_forin(chunk_t *pc)
 }
 
 
-void set_chunk_type_real(chunk_t *pc, c_token_t tt);
+void set_chunk_type_real(chunk_t *pc, c_token_t tt, const char *func, int line);
 
 
-void set_chunk_parent_real(chunk_t *pc, c_token_t tt);
+void set_chunk_parent_real(chunk_t *pc, c_token_t tt, const char *func, int line);
 
 
-#define set_chunk_type(pc, tt)      do { \
-      LOG_FUNC_CALL();                   \
-      set_chunk_type_real((pc), (tt));   \
+#define set_chunk_type(pc, tt)      do {                   \
+      set_chunk_type_real((pc), (tt), __func__, __LINE__); \
 } while (false)
 
-#define set_chunk_parent(pc, tt)    do { \
-      LOG_FUNC_CALL();                   \
-      set_chunk_parent_real((pc), (tt)); \
+#define set_chunk_parent(pc, tt)    do {                     \
+      set_chunk_parent_real((pc), (tt), __func__, __LINE__); \
 } while (false)
+
+
+c_token_t get_chunk_parent_type(chunk_t *pc);
 
 
 void chunk_flags_set_real(chunk_t *pc, pcf_flags_t clr_bits, pcf_flags_t set_bits);
 
 
 #define chunk_flags_upd(pc, cc, ss)    do {   \
-      LOG_FUNC_CALL();                        \
       chunk_flags_set_real((pc), (cc), (ss)); \
 } while (false)
 
 #define chunk_flags_set(pc, ss)        do { \
-      LOG_FUNC_CALL();                      \
       chunk_flags_set_real((pc), {}, (ss)); \
 } while (false)
 
 #define chunk_flags_clr(pc, cc)        do { \
-      LOG_FUNC_CALL();                      \
       chunk_flags_set_real((pc), (cc), {}); \
 } while (false)
+
+
+void chunk_set_parent(chunk_t *pc, chunk_t *parent);
+
+
+c_token_t get_type_of_the_parent(chunk_t *pc);
 
 
 #endif /* CHUNK_LIST_H_INCLUDED */

@@ -14,7 +14,6 @@
 #include "uncrustify.h"
 
 
-#ifdef DEVELOP_ONLY
 /*
  * the test suite Coveralls: https://coveralls.io
  * will complains because these functions are only
@@ -31,16 +30,33 @@ static size_t counter = 0;
 static size_t tokenCounter;
 
 
-// protocol of the line
-// examples:
-//   prot_the_line(__func__, __LINE__, pc->orig_line);
-//   prot_the_line(__func__, __LINE__, 6, 5);
-//   prot_the_source(__LINE__);
-// log_pcf_flags(LSYS, pc->flags);
-// if partNumber is zero, all the tokens of the line are shown,
-// if partNumber is NOT zero, only the token with this partNumber is shown.
+/* protocol of the line
+ * examples:
+ *   prot_the_line(__func__, __LINE__, pc->orig_line);
+ *   prot_the_line(__func__, __LINE__, 0, 0);
+ *   prot_the_line(__func__, __LINE__, 6, 5);
+ *   prot_the_source(__LINE__);
+ *   log_pcf_flags(LSYS, pc->flags);
+ *
+ * if actual_line is zero, use the option debug_line_number_to_protocol.
+ * if the value is zero, don't make any protocol and return.
+ *
+ * if partNumber is zero, all the tokens of the line are shown,
+ * if partNumber is NOT zero, only the token with this partNumber is shown.
+ */
 void prot_the_line(const char *func_name, int theLine, unsigned int actual_line, size_t partNumber)
 {
+   if (actual_line == 0)
+   {
+      // use the option debug_line_number_to_protocol.
+      actual_line = options::debug_line_number_to_protocol();
+
+      if (actual_line == 0)
+      {
+         // don't make any protocol.
+         return;
+      }
+   }
    counter++;
    tokenCounter = 0;
    LOG_FMT(LGUY, "Prot_the_line:(%s:%d)(%zu)\n", func_name, theLine, counter);
@@ -85,7 +101,7 @@ void prot_the_line(const char *func_name, int theLine, unsigned int actual_line,
                LOG_FMT(LGUY, "text() '%s', ", pc->text());
             }
             LOG_FMT(LGUY, " column is %zu, type is %s, parent_type is %s, orig_col is %zu,",
-                    pc->column, get_token_name(pc->type), get_token_name(pc->parent_type), pc->orig_col);
+                    pc->column, get_token_name(pc->type), get_token_name(get_chunk_parent_type(pc)), pc->orig_col);
 
             if (chunk_is_token(pc, CT_IGNORED))
             {
@@ -96,6 +112,7 @@ void prot_the_line(const char *func_name, int theLine, unsigned int actual_line,
                LOG_FMT(LGUY, " pc->flags: ");
                log_pcf_flags(LGUY, pc->flags);
             }
+            LOG_FMT(LALAGAIN, "   align.right_align is %s\n", pc->align.right_align ? "TRUE" : "FALSE");
          }
       }
    }
@@ -228,11 +245,6 @@ void dump_out(unsigned int type)
             fprintf(D_file, "  orig_prev_sp %u\n", pc->orig_prev_sp);
          }
 
-         if (pc->flags != 0)
-         {
-            fprintf(D_file, "  flags %" PRIu64 "\n", pc->flags);
-         }
-
          if (pc->column != 0)
          {
             fprintf(D_file, "  column %zu\n", pc->column);
@@ -351,10 +363,6 @@ void dump_in(unsigned int type)
             {
                chunk.orig_prev_sp = strtol(parts[1], nullptr, 0);
             }
-            else if (strcasecmp(parts[0], "flags") == 0)
-            {
-               chunk.flags = strtol(parts[1], nullptr, 0);
-            }
             else if (strcasecmp(parts[0], "column") == 0)
             {
                chunk.column = strtol(parts[1], nullptr, 0);
@@ -400,4 +408,13 @@ void dump_in(unsigned int type)
       exit(EX_SOFTWARE);
    }
 } // dump_in
-#endif /* DEVELOP_ONLY */
+
+
+size_t number = 0;
+
+
+size_t get_A_Number()
+{
+   number = number + 1;
+   return(number);
+}

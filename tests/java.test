@@ -21,6 +21,7 @@
 80063  empty.cfg                            java/i1121.java
 80064  mod_add_long_class_closebrace_comment-1.cfg  java/long_cl_cmt.java
 80065  empty.cfg                            java/Java8DoubleColon.java
+80066  sp_after_for_colon.cfg               java/sp_after_for_colon.java
 
 80100  align_same_func_call_params-t.cfg    java/sf567.java
 
@@ -38,3 +39,4 @@
 80303  Issue_1122.cfg                       java/Issue_1122.java
 80304  Issue_1124-f.cfg                     java/Issue_1124.java
 80305  Issue_1124-r.cfg                     java/Issue_1124.java
+80306  leading-tabs-for-java-lambda.cfg     java/leading-tabs-for-java-lambda.java

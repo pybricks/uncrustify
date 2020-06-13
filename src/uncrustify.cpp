@@ -6,7 +6,6 @@
  * @license GPL v2+
  */
 
-#define DEFINE_PCF_NAMES
 #define DEFINE_CHAR_TABLE
 
 #include "uncrustify.h"
@@ -19,7 +18,6 @@
 #include "backup.h"
 #include "brace_cleanup.h"
 #include "braces.h"
-#include "char_table.h"
 #include "chunk_list.h"
 #include "combine.h"
 #include "compat.h"
@@ -30,20 +28,25 @@
 #include "lang_pawn.h"
 #include "language_tools.h"
 #include "log_levels.h"
+#include "log_rules.h"
 #include "logger.h"
 #include "md5.h"
 #include "newlines.h"
 #include "options.h"
 #include "output.h"
 #include "parens.h"
+#include "pcf_flags.h"
 #include "prototypes.h"
+#include "remove_extra_returns.h"
 #include "semicolons.h"
 #include "sorting.h"
 #include "space.h"
+#include "token_enum.h"
 #include "token_names.h"
 #include "tokenize.h"
 #include "tokenize_cleanup.h"
 #include "unc_ctype.h"
+#include "unc_tools.h"
 #include "uncrustify_types.h"
 #include "uncrustify_version.h"
 #include "unicode.h"
@@ -233,8 +236,8 @@ void usage_error(const char *msg)
 static void tease()
 {
    fprintf(stdout,
-           "There are currently %zu options and minimal documentation.\n"
-           "Try UniversalIndentGUI and good luck.\n", get_option_count());
+           "There are currently %d options and minimal documentation.\n"
+           "Try UniversalIndentGUI and good luck.\n", (int)get_option_count());
 }
 
 
@@ -437,8 +440,8 @@ int main(int argc, char *argv[])
 
       if (lengthOfTheName > MAXLENGTHOFTHENAME)
       {
-         fprintf(stderr, "%s(%d): The token name '%s' is too long (%zu)\n",
-                 __func__, __LINE__, token_names[token], lengthOfTheName);
+         fprintf(stderr, "%s(%d): The token name '%s' is too long (%d)\n",
+                 __func__, __LINE__, token_names[token], (int)lengthOfTheName);
          fprintf(stderr, "%s(%d): the max token name length is %d\n",
                  __func__, __LINE__, MAXLENGTHOFTHENAME);
          log_flush(true);
@@ -624,6 +627,7 @@ int main(int argc, char *argv[])
    // Grab the output override
    const char *output_file = arg.Param("-o");
 
+   LOG_FMT(LDATA, "%s\n", UNCRUSTIFY_VERSION);
    LOG_FMT(LDATA, "config_file = %s\n", cfg_file.c_str());
    LOG_FMT(LDATA, "output_file = %s\n", (output_file != NULL) ? output_file : "null");
    LOG_FMT(LDATA, "source_file = %s\n", (source_file != NULL) ? source_file : "null");
@@ -692,11 +696,14 @@ int main(int argc, char *argv[])
          usage_error("Unable to load the config file");
          return(EX_IOERR);
       }
-
       // test if all options are compatible to each other
+      log_rule_B("nl_max");
+
       if (options::nl_max() > 0)
       {
          // test if one/some option(s) is/are not too big for that
+         log_rule_B("nl_func_var_def_blk");
+
          if (options::nl_func_var_def_blk() >= options::nl_max())
          {
             fprintf(stderr, "The option 'nl_func_var_def_blk' is too big against the option 'nl_max'\n");
@@ -1026,6 +1033,22 @@ static bool read_stdin(file_mem &fm)
    fm.data.clear();
    fm.enc = char_encoding_e::e_ASCII;
 
+   // Re-open stdin in binary mode to preserve newline characters
+#ifdef WIN32
+   _setmode(_fileno(stdin), _O_BINARY);
+#else
+   FILE *my_stdin = stdin;  // Reopen stdin
+
+   my_stdin = freopen(NULL, "rb", stdin);
+
+   if (my_stdin == nullptr)
+   {
+      cpd.error_count++;
+      usage_error();
+      return(EX_IOERR);
+   }
+#endif
+
    while (!feof(stdin))
    {
       int len = fread(buf, 1, sizeof(buf), stdin);
@@ -1183,30 +1206,36 @@ int load_header_files()
 {
    int retval = 0;
 
+   log_rule_B("cmt_insert_file_header");
+
    if (!options::cmt_insert_file_header().empty())
    {
       // try to load the file referred to by the options string
       retval |= load_mem_file_config(options::cmt_insert_file_header(),
                                      cpd.file_hdr);
    }
+   log_rule_B("cmt_insert_file_footer");
 
    if (!options::cmt_insert_file_footer().empty())
    {
       retval |= load_mem_file_config(options::cmt_insert_file_footer(),
                                      cpd.file_ftr);
    }
+   log_rule_B("cmt_insert_func_header");
 
    if (!options::cmt_insert_func_header().empty())
    {
       retval |= load_mem_file_config(options::cmt_insert_func_header(),
                                      cpd.func_hdr);
    }
+   log_rule_B("cmt_insert_class_header");
 
    if (!options::cmt_insert_class_header().empty())
    {
       retval |= load_mem_file_config(options::cmt_insert_class_header(),
                                      cpd.class_hdr);
    }
+   log_rule_B("cmt_insert_oc_msg_header");
 
    if (!options::cmt_insert_oc_msg_header().empty())
    {
@@ -1214,7 +1243,7 @@ int load_header_files()
                                      cpd.oc_msg_hdr);
    }
    return(retval);
-}
+} // load_header_files
 
 
 static const char *make_output_filename(char *buf, size_t buf_size,
@@ -1262,6 +1291,7 @@ static bool file_content_matches(const string &filename1, const string &filename
    int   len2 = 0;
    UINT8 buf1[1024];
    UINT8 buf2[1024];
+
    memset(buf1, 0, sizeof(buf1));
    memset(buf2, 0, sizeof(buf2));
 
@@ -1568,6 +1598,7 @@ static void add_func_header(c_token_t type, file_mem &fm)
       {
          continue;
       }
+      log_rule_B("cmt_insert_before_inlines");
 
       if (  pc->flags.test(PCF_IN_CLASS)
          && !options::cmt_insert_before_inlines())
@@ -1578,13 +1609,13 @@ static void add_func_header(c_token_t type, file_mem &fm)
       ref = pc;
 
       if (  chunk_is_token(ref, CT_CLASS)
-         && ref->parent_type == CT_NONE
+         && get_chunk_parent_type(ref) == CT_NONE
          && ref->next)
       {
          ref = ref->next;
 
          if (  chunk_is_token(ref, CT_TYPE)
-            && ref->parent_type == type
+            && get_chunk_parent_type(ref) == type
             && ref->next)
          {
             ref = ref->next;
@@ -1599,7 +1630,7 @@ static void add_func_header(c_token_t type, file_mem &fm)
       ref = pc;
 
       if (  chunk_is_token(ref, CT_FUNC_DEF)
-         && ref->parent_type == CT_NONE
+         && get_chunk_parent_type(ref) == CT_NONE
          && ref->next)
       {
          int found_brace = 0;                                 // Set if a close brace is found before a newline
@@ -1647,9 +1678,11 @@ static void add_func_header(c_token_t type, file_mem &fm)
          {
             tmp = chunk_get_prev_type(ref, CT_PREPROC, ref->level);
 
-            if (tmp != nullptr && tmp->parent_type == CT_PP_IF)
+            if (tmp != nullptr && get_chunk_parent_type(tmp) == CT_PP_IF)
             {
                tmp = chunk_get_prev_nnl(tmp);
+
+               log_rule_B("cmt_insert_before_preproc");
 
                if (  chunk_is_comment(tmp)
                   && !options::cmt_insert_before_preproc())
@@ -1732,9 +1765,11 @@ static void add_msg_header(c_token_t type, file_mem &fm)
          {
             tmp = chunk_get_prev_type(ref, CT_PREPROC, ref->level);
 
-            if (tmp != nullptr && tmp->parent_type == CT_PP_IF)
+            if (tmp != nullptr && get_chunk_parent_type(tmp) == CT_PP_IF)
             {
                tmp = chunk_get_prev_nnl(tmp);
+
+               log_rule_B("cmt_insert_before_preproc");
 
                if (  chunk_is_comment(tmp)
                   && !options::cmt_insert_before_preproc())
@@ -1781,6 +1816,7 @@ static void uncrustify_start(const deque<int> &data)
 {
    // Parse the text into chunks
    tokenize(data, nullptr);
+   PROT_THE_LINE
 
    cpd.unc_stage = unc_stage_e::HEADER;
 
@@ -1845,6 +1881,9 @@ void uncrustify_file(const file_mem &fm, FILE *pfout,
    cpd.bom = fm.bom;
    cpd.enc = fm.enc;
 
+   log_rule_B("utf8_force");
+   log_rule_B("utf8_byte");
+
    if (  options::utf8_force()
       || ((cpd.enc == char_encoding_e::e_BYTE) && options::utf8_byte()))
    {
@@ -1855,6 +1894,7 @@ void uncrustify_file(const file_mem &fm, FILE *pfout,
    switch (cpd.enc)
    {
    case char_encoding_e::e_UTF8:
+      log_rule_B("utf8_bom");
       av = options::utf8_bom();
       break;
 
@@ -1914,6 +1954,8 @@ void uncrustify_file(const file_mem &fm, FILE *pfout,
       {
          add_func_header(CT_FUNC_DEF, cpd.func_hdr);
 
+         log_rule_B("cmt_insert_before_ctor_dtor");
+
          if (options::cmt_insert_before_ctor_dtor())
          {
             add_func_header(CT_FUNC_CLASS_DEF, cpd.func_hdr);
@@ -1932,12 +1974,15 @@ void uncrustify_file(const file_mem &fm, FILE *pfout,
       do_braces();  // Change virtual braces into real braces...
 
       // Scrub extra semicolons
+      log_rule_B("mod_remove_extra_semicolon");
+
       if (options::mod_remove_extra_semicolon())
       {
          remove_extra_semicolons();
       }
-
       // Remove unnecessary returns
+      log_rule_B("mod_remove_empty_return");
+
       if (options::mod_remove_empty_return())
       {
          remove_extra_returns();
@@ -1948,6 +1993,8 @@ void uncrustify_file(const file_mem &fm, FILE *pfout,
       // Modify line breaks as needed
       bool first = true;
       int  old_changes;
+
+      log_rule_B("nl_remove_extra_newlines");
 
       if (options::nl_remove_extra_newlines() == 2)
       {
@@ -1967,10 +2014,13 @@ void uncrustify_file(const file_mem &fm, FILE *pfout,
          newlines_cleanup_braces(first);
          newlines_cleanup_angles();                           // Issue #1167
 
+         log_rule_B("nl_after_multiline_comment");
+
          if (options::nl_after_multiline_comment())
          {
             newline_after_multiline_comment();
          }
+         log_rule_B("nl_after_label_colon");
 
          if (options::nl_after_label_colon())
          {
@@ -1978,31 +2028,39 @@ void uncrustify_file(const file_mem &fm, FILE *pfout,
          }
          newlines_insert_blank_lines();
 
+         log_rule_B("pos_bool");
+
          if (options::pos_bool() != TP_IGNORE)
          {
             newlines_chunk_pos(CT_BOOL, options::pos_bool());
          }
+         log_rule_B("pos_compare");
 
          if (options::pos_compare() != TP_IGNORE)
          {
             newlines_chunk_pos(CT_COMPARE, options::pos_compare());
          }
+         log_rule_B("pos_conditional");
 
          if (options::pos_conditional() != TP_IGNORE)
          {
             newlines_chunk_pos(CT_COND_COLON, options::pos_conditional());
             newlines_chunk_pos(CT_QUESTION, options::pos_conditional());
          }
+         log_rule_B("pos_comma");
+         log_rule_B("pos_enum_comma");
 
          if (options::pos_comma() != TP_IGNORE || options::pos_enum_comma() != TP_IGNORE)
          {
             newlines_chunk_pos(CT_COMMA, options::pos_comma());
          }
+         log_rule_B("pos_assign");
 
          if (options::pos_assign() != TP_IGNORE)
          {
             newlines_chunk_pos(CT_ASSIGN, options::pos_assign());
          }
+         log_rule_B("pos_arith");
 
          if (options::pos_arith() != TP_IGNORE)
          {
@@ -2012,10 +2070,13 @@ void uncrustify_file(const file_mem &fm, FILE *pfout,
          newlines_class_colon_pos(CT_CLASS_COLON);
          newlines_class_colon_pos(CT_CONSTR_COLON);
 
+         log_rule_B("nl_squeeze_ifdef");
+
          if (options::nl_squeeze_ifdef())
          {
             newlines_squeeze_ifdef();
          }
+         log_rule_B("nl_squeeze_paren_close");
 
          if (options::nl_squeeze_paren_close())
          {
@@ -2031,18 +2092,24 @@ void uncrustify_file(const file_mem &fm, FILE *pfout,
       mark_comments();
 
       // Add balanced spaces around nested params
+      log_rule_B("sp_balance_nested_parens");
+
       if (options::sp_balance_nested_parens())
       {
          space_text_balance_nested_parens();
       }
-
       // Scrub certain added semicolons
+      log_rule_B("mod_pawn_semicolon");
+
       if (language_is_set(LANG_PAWN) && options::mod_pawn_semicolon())
       {
          pawn_scrub_vsemi();
       }
-
       // Sort imports/using/include
+      log_rule_B("mod_sort_import");
+      log_rule_B("mod_sort_include");
+      log_rule_B("mod_sort_using");
+
       if (  options::mod_sort_import()
          || options::mod_sort_include()
          || options::mod_sort_using())
@@ -2053,6 +2120,8 @@ void uncrustify_file(const file_mem &fm, FILE *pfout,
       space_text();
 
       // Do any aligning of preprocessors
+      log_rule_B("align_pp_define_span");
+
       if (options::align_pp_define_span() > 0)
       {
          align_preprocessor();
@@ -2062,6 +2131,11 @@ void uncrustify_file(const file_mem &fm, FILE *pfout,
       indent_text();
 
       // Insert trailing comments after certain close braces
+      log_rule_B("mod_add_long_switch_closebrace_comment");
+      log_rule_B("mod_add_long_function_closebrace_comment");
+      log_rule_B("mod_add_long_class_closebrace_comment");
+      log_rule_B("mod_add_long_namespace_closebrace_comment");
+
       if (  (options::mod_add_long_switch_closebrace_comment() > 0)
          || (options::mod_add_long_function_closebrace_comment() > 0)
          || (options::mod_add_long_class_closebrace_comment() > 0)
@@ -2069,8 +2143,10 @@ void uncrustify_file(const file_mem &fm, FILE *pfout,
       {
          add_long_closebrace_comment();
       }
-
       // Insert trailing comments after certain preprocessor conditional blocks
+      log_rule_B("mod_add_long_ifdef_else_comment");
+      log_rule_B("mod_add_long_ifdef_endif_comment");
+
       if (  (options::mod_add_long_ifdef_else_comment() > 0)
          || (options::mod_add_long_ifdef_endif_comment() > 0))
       {
@@ -2085,10 +2161,23 @@ void uncrustify_file(const file_mem &fm, FILE *pfout,
          indent_text();
          old_changes = cpd.changes;
 
+         log_rule_B("code_width");
+
          if (options::code_width() > 0)
          {
             LOG_FMT(LNEWLINE, "%s(%d): Code_width loop start: %d\n",
                     __func__, __LINE__, cpd.changes);
+
+            if (options::debug_max_number_of_loops() > 0)
+            {
+               if (cpd.changes > options::debug_max_number_of_loops())                 // Issue #2432
+               {
+                  LOG_FMT(LNEWLINE, "%s(%d): too many loop. Make a report, please.\n",
+                          __func__, __LINE__);
+                  log_flush(true);
+                  exit(EX_SOFTWARE);
+               }
+            }
             do_code_width();
 
             if (old_changes != cpd.changes && first)
@@ -2103,6 +2192,8 @@ void uncrustify_file(const file_mem &fm, FILE *pfout,
 
       // And finally, align the backslash newline stuff
       align_right_comments();
+
+      log_rule_B("align_nl_cont");
 
       if (options::align_nl_cont())
       {
@@ -2427,46 +2518,4 @@ static size_t language_flags_from_filename(const char *filename)
    }
 
    return(LANG_C);
-}
-
-
-std::string pcf_flags_str(pcf_flags_t flags)
-{
-   char buffer[64];
-
-   // Generate hex representation first
-   snprintf(buffer, 63, "[0x%llx:", static_cast<pcf_flags_t::int_t>(flags));
-
-   // Add human-readable names
-   auto out   = std::string{ buffer };
-   auto first = true;
-
-   for (size_t i = 0; i < ARRAY_SIZE(pcf_names); ++i)
-   {
-      if (flags & static_cast<pcf_flag_e>(pcf_bit(i)))
-      {
-         if (first)
-         {
-            first = false;
-         }
-         else
-         {
-            out += ',';
-         }
-         out += pcf_names[i];
-      }
-   }
-
-   out += ']';
-   return(out);
-}
-
-
-void log_pcf_flags(log_sev_t sev, pcf_flags_t flags)
-{
-   if (!log_sev_on(sev))
-   {
-      return;
-   }
-   log_fmt(sev, "%s\n", pcf_flags_str(flags).c_str());
 }

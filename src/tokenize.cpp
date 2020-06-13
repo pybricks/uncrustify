@@ -14,6 +14,7 @@
 #include "chunk_list.h"
 #include "keywords.h"
 #include "language_tools.h"
+#include "log_rules.h"
 #include "prototypes.h"
 #include "punctuators.h"
 #include "unc_ctype.h"
@@ -111,6 +112,7 @@ struct tok_ctx
          switch (ch)
          {
          case '\t':
+            log_rule_B("input_tab_size");
             c.col = calc_next_tab_column(c.col, options::input_tab_size());
             break;
 
@@ -252,10 +254,11 @@ static bool parse_ignored(tok_ctx &ctx, chunk_t &pc);
  * pc.column is output column
  *
  * @param pc  The structure to update, str is an input.
+ * @param prev_pc  The previous structure
  *
  * @return true/false - whether anything was parsed
  */
-static bool parse_next(tok_ctx &ctx, chunk_t &pc);
+static bool parse_next(tok_ctx &ctx, chunk_t &pc, const chunk_t *prev_pc);
 
 
 /**
@@ -455,7 +458,7 @@ static bool d_parse_string(tok_ctx &ctx, chunk_t &pc)
 
       if (pc.str.size() > 1)
       {
-         pc.type = CT_STRING;
+         set_chunk_type(&pc, CT_STRING);
          return(true);
       }
       ctx.restore();
@@ -509,11 +512,12 @@ static bool parse_comment(tok_ctx &ctx, chunk_t &pc)
    // account for opening two chars
    pc.str = ctx.get();   // opening '/'
    size_t ch = ctx.get();
+
    pc.str.append(ch);    // second char
 
    if (ch == '/')
    {
-      pc.type = CT_COMMENT_CPP;
+      set_chunk_type(&pc, CT_COMMENT_CPP);
 
       while (true)
       {
@@ -569,7 +573,7 @@ static bool parse_comment(tok_ctx &ctx, chunk_t &pc)
    }
    else if (ch == '+')
    {
-      pc.type = CT_COMMENT;
+      set_chunk_type(&pc, CT_COMMENT);
       d_level++;
 
       while (d_level > 0 && ctx.more())
@@ -594,7 +598,7 @@ static bool parse_comment(tok_ctx &ctx, chunk_t &pc)
 
          if ((ch == '\n') || (ch == '\r'))
          {
-            pc.type = CT_COMMENT_MULTI;
+            set_chunk_type(&pc, CT_COMMENT_MULTI);
             pc.nl_count++;
 
             if (ch == '\r')
@@ -618,7 +622,7 @@ static bool parse_comment(tok_ctx &ctx, chunk_t &pc)
    }
    else  // must be '/ *'
    {
-      pc.type = CT_COMMENT;
+      set_chunk_type(&pc, CT_COMMENT);
 
       while (ctx.more())
       {
@@ -650,7 +654,7 @@ static bool parse_comment(tok_ctx &ctx, chunk_t &pc)
 
          if ((ch == '\n') || (ch == '\r'))
          {
-            pc.type = CT_COMMENT_MULTI;
+            set_chunk_type(&pc, CT_COMMENT_MULTI);
             pc.nl_count++;
 
             if (ch == '\r')
@@ -675,6 +679,7 @@ static bool parse_comment(tok_ctx &ctx, chunk_t &pc)
 
    if (cpd.unc_off)
    {
+      log_rule_B("enable_processing_cmt");
       const auto &ontext = options::enable_processing_cmt();
 
       if (!ontext.empty() && pc.str.find(ontext.c_str()) >= 0)
@@ -686,6 +691,7 @@ static bool parse_comment(tok_ctx &ctx, chunk_t &pc)
    }
    else
    {
+      log_rule_B("disable_processing_cmt");
       const auto &offtext = options::disable_processing_cmt();
 
       if (!offtext.empty() && pc.str.find(offtext.c_str()) >= 0)
@@ -724,7 +730,7 @@ static bool parse_code_placeholder(tok_ctx &ctx, chunk_t &pc)
 
       if ((last2 == '#') && (last1 == '>'))
       {
-         pc.type = CT_WORD;
+         set_chunk_type(&pc, CT_WORD);
          return(true);
       }
    }
@@ -962,7 +968,7 @@ static bool parse_number(tok_ctx &ctx, chunk_t &pc)
       if (ctx.peek(1) == '(')
       {
          ctx.restore(ss);
-         pc.type = CT_NUMBER;
+         set_chunk_type(&pc, CT_NUMBER);
          return(true);
       }
       else
@@ -1048,7 +1054,7 @@ static bool parse_number(tok_ctx &ctx, chunk_t &pc)
       pc.str.append(ctx.get());
       pc.str.append(ctx.get());
    }
-   pc.type = is_float ? CT_NUMBER_FP : CT_NUMBER;
+   set_chunk_type(&pc, is_float ? CT_NUMBER_FP : CT_NUMBER);
 
    /*
     * If there is anything left, then we are probably dealing with garbage or
@@ -1062,10 +1068,15 @@ static bool parse_number(tok_ctx &ctx, chunk_t &pc)
 
 static bool parse_string(tok_ctx &ctx, chunk_t &pc, size_t quote_idx, bool allow_escape)
 {
-   size_t escape_char        = options::string_escape_char();
-   size_t escape_char2       = options::string_escape_char2();
-   bool   should_escape_tabs = (  options::string_replace_tab_chars()
-                               && language_is_set(LANG_ALLC));
+   log_rule_B("string_escape_char");
+   size_t escape_char = options::string_escape_char();
+
+   log_rule_B("string_escape_char2");
+   size_t escape_char2 = options::string_escape_char2();
+
+   log_rule_B("string_replace_tab_chars");
+   bool should_escape_tabs = (  options::string_replace_tab_chars()
+                             && language_is_set(LANG_ALLC));
 
    pc.str.clear();
 
@@ -1073,9 +1084,10 @@ static bool parse_string(tok_ctx &ctx, chunk_t &pc, size_t quote_idx, bool allow
    {
       pc.str.append(ctx.get());
    }
-   pc.type = CT_STRING;
+   set_chunk_type(&pc, CT_STRING);
    size_t end_ch = CharTable::Get(ctx.peek()) & 0xff;
-   pc.str.append(ctx.get());  // store the "
+
+   pc.str.append(ctx.get());                          // store the "
 
    bool escaped = false;
 
@@ -1096,7 +1108,7 @@ static bool parse_string(tok_ctx &ctx, chunk_t &pc, size_t quote_idx, bool allow
       if (ch == '\n')
       {
          pc.nl_count++;
-         pc.type = CT_STRING_MULTI;
+         set_chunk_type(&pc, CT_STRING_MULTI);
          escaped = false;
          continue;
       }
@@ -1105,7 +1117,7 @@ static bool parse_string(tok_ctx &ctx, chunk_t &pc, size_t quote_idx, bool allow
       {
          pc.str.append(ctx.get());
          pc.nl_count++;
-         pc.type = CT_STRING_MULTI;
+         set_chunk_type(&pc, CT_STRING_MULTI);
          escaped = false;
          continue;
       }
@@ -1169,7 +1181,7 @@ static cs_string_t parse_cs_string_start(tok_ctx &ctx, chunk_t &pc)
    {
       stringType |= CS_STRING_STRING;
 
-      pc.type = CT_STRING;
+      set_chunk_type(&pc, CT_STRING);
 
       for (int i = 0; i <= offset; ++i)
       {
@@ -1214,8 +1226,10 @@ static bool parse_cs_string(tok_ctx &ctx, chunk_t &pc)
    // parse the outermost string.
 
    std::stack<CsStringParseState> parseState; // each entry is a nested string
+
    parseState.push(CsStringParseState(stringType));
 
+   log_rule_B("string_replace_tab_chars");
    bool should_escape_tabs = options::string_replace_tab_chars();
 
    while (ctx.more())
@@ -1255,12 +1269,12 @@ static bool parse_cs_string(tok_ctx &ctx, chunk_t &pc)
 
       if (ch == '\n')
       {
-         pc.type = CT_STRING_MULTI;
+         set_chunk_type(&pc, CT_STRING_MULTI);
          pc.nl_count++;
       }
       else if (ch == '\r')
       {
-         pc.type = CT_STRING_MULTI;
+         set_chunk_type(&pc, CT_STRING_MULTI);
       }
       else if (parseState.top().braceDepth > 0)
       {
@@ -1274,6 +1288,7 @@ static bool parse_cs_string(tok_ctx &ctx, chunk_t &pc)
             {
                cpd.warned_unable_string_replace_tab_chars = true;
 
+               log_rule_B("warn_level_tabs_found_in_verbatim_string_literals");
                log_sev_t warnlevel = (log_sev_t)options::warn_level_tabs_found_in_verbatim_string_literals();
 
                /*
@@ -1347,7 +1362,7 @@ static bool parse_cs_string(tok_ctx &ctx, chunk_t &pc)
 
 static void parse_verbatim_string(tok_ctx &ctx, chunk_t &pc)
 {
-   pc.type = CT_STRING;
+   set_chunk_type(&pc, CT_STRING);
 
    // consume the initial """
    pc.str = ctx.get();
@@ -1371,7 +1386,7 @@ static void parse_verbatim_string(tok_ctx &ctx, chunk_t &pc)
 
       if ((ch == '\n') || (ch == '\r'))
       {
-         pc.type = CT_STRING_MULTI;
+         set_chunk_type(&pc, CT_STRING_MULTI);
          pc.nl_count++;
       }
    }
@@ -1422,7 +1437,7 @@ static bool parse_cr_string(tok_ctx &ctx, chunk_t &pc, size_t q_idx)
       ctx.restore();
       return(false);
    }
-   pc.type = CT_STRING;
+   set_chunk_type(&pc, CT_STRING);
 
    while (ctx.more())
    {
@@ -1444,7 +1459,7 @@ static bool parse_cr_string(tok_ctx &ctx, chunk_t &pc, size_t q_idx)
       {
          pc.str.append(ctx.get());
          pc.nl_count++;
-         pc.type = CT_STRING_MULTI;
+         set_chunk_type(&pc, CT_STRING_MULTI);
       }
       else
       {
@@ -1496,7 +1511,7 @@ static bool parse_word(tok_ctx &ctx, chunk_t &pc, bool skipcheck)
          skipcheck = true;
       }
    }
-   pc.type = CT_WORD;
+   set_chunk_type(&pc, CT_WORD);
 
    if (skipcheck)
    {
@@ -1508,11 +1523,13 @@ static bool parse_word(tok_ctx &ctx, chunk_t &pc, bool skipcheck)
    {
       if (ctx.peek() == '(')
       {
-         pc.type = CT_MACRO_FUNC;
+         set_chunk_type(&pc, CT_MACRO_FUNC);
       }
       else
       {
-         pc.type = CT_MACRO;
+         set_chunk_type(&pc, CT_MACRO);
+
+         log_rule_B("pp_ignore_define_body");
 
          if (options::pp_ignore_define_body())
          {
@@ -1531,13 +1548,13 @@ static bool parse_word(tok_ctx &ctx, chunk_t &pc, bool skipcheck)
          && pc.str.startswith("@")
          && !pc.str.equals(intr_txt))
       {
-         pc.type = CT_ANNOTATION;
+         set_chunk_type(&pc, CT_ANNOTATION);
       }
       else
       {
          // Turn it into a keyword now
          // Issue #1460 will return "COMMENT_CPP"
-         pc.type = find_keyword_type(pc.text(), pc.str.size());
+         set_chunk_type(&pc, find_keyword_type(pc.text(), pc.str.size()));
 
          /* Special pattern: if we're trying to redirect a preprocessor directive to PP_IGNORE,
           * then ensure we're actually part of a preprocessor before doing the swap, or we'll
@@ -1546,7 +1563,7 @@ static bool parse_word(tok_ctx &ctx, chunk_t &pc, bool skipcheck)
           * substitution. */
          if (pc.type == CT_PP_IGNORE && !cpd.in_preproc)
          {
-            pc.type = find_keyword_type(pc.text(), pc.str.size());
+            set_chunk_type(&pc, find_keyword_type(pc.text(), pc.str.size()));
          }
          else if (pc.type == CT_COMMENT_CPP)   // Issue #1460
          {
@@ -1689,7 +1706,7 @@ static bool extract_attribute_specifier_sequence(tok_ctx &ctx, chunk_t &pc, size
    {
       pc.str.append(ctx.get());
    }
-   pc.type = CT_ATTRIBUTE;
+   set_chunk_type(&pc, CT_ATTRIBUTE);
    return(true);
 } // extract_attribute_specifier_sequence
 
@@ -1730,6 +1747,7 @@ static bool parse_whitespace(tok_ctx &ctx, chunk_t &pc)
          break;
 
       case '\t':
+         log_rule_B("input_tab_size");
          pc.orig_prev_sp += calc_next_tab_column(cpd.column, options::input_tab_size()) - cpd.column;
          break;
 
@@ -1745,8 +1763,8 @@ static bool parse_whitespace(tok_ctx &ctx, chunk_t &pc)
    if (ch != 0)
    {
       pc.str.clear();
+      set_chunk_type(&pc, nl_count ? CT_NEWLINE : CT_WHITESPACE);
       pc.nl_count  = nl_count;
-      pc.type      = nl_count ? CT_NEWLINE : CT_WHITESPACE;
       pc.after_tab = (ctx.c.last_ch == '\t');
       return(true);
    }
@@ -1771,8 +1789,8 @@ static bool parse_bs_newline(tok_ctx &ctx, chunk_t &pc)
          {
             ctx.expect('\n');
          }
+         set_chunk_type(&pc, CT_NL_CONT);
          pc.str      = "\\";
-         pc.type     = CT_NL_CONT;
          pc.nl_count = 1;
          return(true);
       }
@@ -1809,7 +1827,7 @@ static bool parse_newline(tok_ctx &ctx)
 static void parse_pawn_pattern(tok_ctx &ctx, chunk_t &pc, c_token_t tt)
 {
    pc.str.clear();
-   pc.type = tt;
+   set_chunk_type(&pc, tt);
 
    while (!unc_isspace(ctx.peek()))
    {
@@ -1828,7 +1846,7 @@ static void parse_pawn_pattern(tok_ctx &ctx, chunk_t &pc, c_token_t tt)
 }
 
 
-static bool parse_ignored(tok_ctx &ctx, chunk_t &pc)
+static bool parse_off_newlines(tok_ctx &ctx, chunk_t &pc)
 {
    size_t nl_count = 0;
 
@@ -1841,7 +1859,56 @@ static bool parse_ignored(tok_ctx &ctx, chunk_t &pc)
    if (nl_count > 0)
    {
       pc.nl_count = nl_count;
-      pc.type     = CT_NEWLINE;
+      set_chunk_type(&pc, CT_NEWLINE);
+      return(true);
+   }
+   return(false);
+}
+
+
+static bool parse_macro(tok_ctx &ctx, chunk_t &pc, const chunk_t *prev_pc)
+{
+   if (parse_off_newlines(ctx, pc))
+   {
+      return(true);
+   }
+
+   if (parse_comment(ctx, pc))  // allow CT_COMMENT_MULTI within macros
+   {
+      return(true);
+   }
+   ctx.save();
+   pc.str.clear();
+
+   bool continued = chunk_is_token(prev_pc, CT_NL_CONT) || chunk_is_token(prev_pc, CT_COMMENT_MULTI);
+
+   while (ctx.more())
+   {
+      size_t pk = ctx.peek(), pk1 = ctx.peek(1);
+      bool   nl      = (pk == '\n' || pk == '\r');
+      bool   nl_cont = (pk == '\\' && (pk1 == '\n' || pk1 == '\r'));
+
+      if ((nl_cont || (continued && nl)) && pc.str.size() > 0)
+      {
+         set_chunk_type(&pc, CT_IGNORED);
+         return(true);
+      }
+      else if (nl)
+      {
+         break;
+      }
+      pc.str.append(ctx.get());
+   }
+   pc.str.clear();
+   ctx.restore();
+   return(false);
+}
+
+
+static bool parse_ignored(tok_ctx &ctx, chunk_t &pc)
+{
+   if (parse_off_newlines(ctx, pc))
+   {
       return(true);
    }
    // See if the UO_enable_processing_cmt or #pragma endasm / #endasm text is on this line
@@ -1872,11 +1939,12 @@ static bool parse_ignored(tok_ctx &ctx, chunk_t &pc)
       return(false);
    }
    // Note that we aren't actually making sure this is in a comment, yet
+   log_rule_B("enable_processing_cmt");
    const auto &ontext = options::enable_processing_cmt();
 
    if (!ontext.empty() && pc.str.find(ontext.c_str()) < 0)
    {
-      pc.type = CT_IGNORED;
+      set_chunk_type(&pc, CT_IGNORED);
       return(true);
    }
    ctx.restore();
@@ -1884,7 +1952,7 @@ static bool parse_ignored(tok_ctx &ctx, chunk_t &pc)
    // parse off whitespace leading to the comment
    if (parse_whitespace(ctx, pc))
    {
-      pc.type = CT_IGNORED;
+      set_chunk_type(&pc, CT_IGNORED);
       return(true);
    }
 
@@ -1905,24 +1973,24 @@ static bool parse_ignored(tok_ctx &ctx, chunk_t &pc)
 
    if (pc.str.size() > 0)
    {
-      pc.type = CT_IGNORED;
+      set_chunk_type(&pc, CT_IGNORED);
       return(true);
    }
    return(false);
 } // parse_ignored
 
 
-static bool parse_next(tok_ctx &ctx, chunk_t &pc)
+static bool parse_next(tok_ctx &ctx, chunk_t &pc, const chunk_t *prev_pc)
 {
    if (!ctx.more())
    {
       return(false);
    }
    // Save off the current column
+   set_chunk_type(&pc, CT_NONE);
    pc.orig_line = ctx.c.row;
    pc.column    = ctx.c.col;
    pc.orig_col  = ctx.c.col;
-   pc.type      = CT_NONE;
    pc.nl_count  = 0;
    pc.flags     = PCF_NONE;
 
@@ -1930,6 +1998,15 @@ static bool parse_next(tok_ctx &ctx, chunk_t &pc)
    if (cpd.unc_off)
    {
       if (parse_ignored(ctx, pc))
+      {
+         return(true);
+      }
+   }
+
+   // Parse macro blocks
+   if (options::disable_processing_nl_cont())
+   {
+      if (parse_macro(ctx, pc, prev_pc))
       {
          return(true);
       }
@@ -1948,7 +2025,7 @@ static bool parse_next(tok_ctx &ctx, chunk_t &pc)
       tok_info ss;
       ctx.save(ss);
       // Chunk to a newline or comment
-      pc.type = CT_PREPROC_BODY;
+      set_chunk_type(&pc, CT_PREPROC_BODY);
       size_t last = 0;
 
       while (ctx.more())
@@ -2116,7 +2193,7 @@ static bool parse_next(tok_ctx &ctx, chunk_t &pc)
          pc.str.clear();
          pc.str.append(ctx.get());
          pc.str.append(ctx.get());
-         pc.type = CT_WORD;
+         set_chunk_type(&pc, CT_WORD);
          return(true);
       }
    }
@@ -2182,6 +2259,16 @@ static bool parse_next(tok_ctx &ctx, chunk_t &pc)
    {
       size_t nc = ctx.peek(1);
 
+      if (nc == 'R') // Issue #2720
+      {
+         if (ctx.peek(2) == '"')
+         {
+            // parse string without escaping
+            parse_string(ctx, pc, 2, false);
+            return(true);
+         }
+      }
+
       if ((nc == '"') || (nc == '\''))
       {
          // literal string
@@ -2210,14 +2297,18 @@ static bool parse_next(tok_ctx &ctx, chunk_t &pc)
    // Check for C++11/14/17/20 attribute specifier sequences
    if (language_is_set(LANG_CPP) && ctx.peek() == '[')
    {
-      if (auto length = parse_attribute_specifier_sequence(ctx))
+      if (!language_is_set(LANG_OC) || !chunk_is_token(prev_pc, CT_OC_AT))
       {
-         extract_attribute_specifier_sequence(ctx, pc, length);
-         return(true);
+         if (auto length = parse_attribute_specifier_sequence(ctx))
+         {
+            extract_attribute_specifier_sequence(ctx, pc, length);
+            return(true);
+         }
       }
    }
    // see if we have a punctuator
    char punc_txt[7];
+
    punc_txt[0] = ctx.peek();
    punc_txt[1] = ctx.peek(1);
    punc_txt[2] = ctx.peek(2);
@@ -2235,7 +2326,7 @@ static bool parse_next(tok_ctx &ctx, chunk_t &pc)
       {
          pc.str.append(ctx.get());
       }
-      pc.type   = punc->type;
+      set_chunk_type(&pc, punc->type);
       pc.flags |= PCF_PUNCTUATOR;
       return(true);
    }
@@ -2261,13 +2352,13 @@ static bool parse_next(tok_ctx &ctx, chunk_t &pc)
          {
             pc.str.append(ctx.get());
          }
-         pc.type   = punc->type;
+         set_chunk_type(&pc, punc->type);
          pc.flags |= PCF_PUNCTUATOR;
          return(true);
       }
    }
    // throw away this character
-   pc.type = CT_UNKNOWN;
+   set_chunk_type(&pc, CT_UNKNOWN);
    pc.str.append(ctx.get());
 
    LOG_FMT(LWARN, "%s:%zu Garbage in col %d: %x\n",
@@ -2293,12 +2384,19 @@ void tokenize(const deque<int> &data, chunk_t *ref)
    {
       chunk.reset();
 
-      if (!parse_next(ctx, chunk))
+      if (!parse_next(ctx, chunk, pc))
       {
          LOG_FMT(LERR, "%s:%zu Bailed before the end?\n",
                  cpd.filename.c_str(), ctx.c.row);
          cpd.error_count++;
          break;
+      }
+
+      if (  language_is_set(LANG_JAVA)
+         && chunk.type == CT_MEMBER
+         && !memcmp(chunk.text(), "->", 2))
+      {
+         chunk.type = CT_LAMBDA;
       }
 
       // Don't create an entry for whitespace
@@ -2442,6 +2540,7 @@ void tokenize(const deque<int> &data, chunk_t *ref)
                  && chunk_is_token(pc, CT_PAREN_CLOSE)
                  && options::pp_ignore_define_body())
          {
+            log_rule_B("pp_ignore_define_body");
             // When we have a PAREN_CLOSE in a PP_DEFINE we should be terminating a MACRO_FUNC
             // arguments list. Therefore we can enter the PP_IGNORE state and ignore next chunks.
             cpd.in_preproc = CT_PP_IGNORE;
@@ -2475,8 +2574,9 @@ void tokenize(const deque<int> &data, chunk_t *ref)
                  __func__, __LINE__, pc->orig_line, pc->orig_col, pc->text(), get_token_name(pc->type), pc->orig_col_end);
       }
    }
-
    // Set the cpd.newline string for this file
+   log_rule_B("newlines");
+
    if (  options::newlines() == LE_LF
       || (  options::newlines() == LE_AUTO
          && (LE_COUNT(LF) >= LE_COUNT(CRLF))

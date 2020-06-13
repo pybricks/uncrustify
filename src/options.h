@@ -8,6 +8,7 @@
  * @author  Matthew Woehlke
  * @license GPL v2+
  */
+
 #ifndef OPTIONS_H_INCLUDED
 #define OPTIONS_H_INCLUDED
 
@@ -75,12 +76,18 @@ string_replace_tab_chars;
 extern Option<bool>
 tok_split_gte;
 
+// Disable formatting of NL_CONT ('\\n') ended lines (e.g. multiline macros)
+extern Option<bool>
+disable_processing_nl_cont;
+
 // Specify the marker used in comments to disable processing of part of the
 // file.
+// The comment should be used alone in one line.
 extern Option<string>
 disable_processing_cmt; // = UNCRUSTIFY_OFF_TEXT
 
 // Specify the marker used in comments to (re)enable processing in a file.
+// The comment should be used alone in one line.
 extern Option<string>
 enable_processing_cmt; // = UNCRUSTIFY_ON_TEXT
 
@@ -772,6 +779,11 @@ sp_catch_paren;
 extern Option<iarf_e>
 sp_oc_catch_paren;
 
+// (OC) Add or remove space before Objective-C protocol list
+// as in '@protocol Protocol<here><Protocol_A>' or '@interface MyClass : NSObject<here><MyProtocol>'.
+extern Option<iarf_e>
+sp_before_oc_proto_list;
+
 // (OC) Add or remove space between class name and '('
 // in '@interface className(categoryName)<ProtocolName>:BaseClass'
 extern Option<iarf_e>
@@ -854,7 +866,7 @@ sp_getset_brace;
 // Add or remove space between a variable and '{' for C++ uniform
 // initialization.
 extern Option<iarf_e>
-sp_word_brace; // = IARF_ADD
+sp_word_brace_init_lst;
 
 // Add or remove space between a variable and '{' for a namespace.
 extern Option<iarf_e>
@@ -1375,6 +1387,11 @@ indent_member_single;
 extern BoundedOption<unsigned, 0, 16>
 indent_sing_line_comments;
 
+// When opening a paren for a control statement (if, for, while, etc), increase
+// the indent level by this value. Negative values decrease the indent level.
+extern BoundedOption<signed, -16, 16>
+indent_sparen_extra;
+
 // Whether to indent trailing single line ('//') comments relative to the code
 // instead of trying to keep the same absolute column.
 extern Option<bool>
@@ -1497,10 +1514,19 @@ indent_preserve_sql;
 extern Option<bool>
 indent_align_assign; // = true
 
+// If true, the indentation of the chunks after a '=' sequence will be set at
+// LHS token indentation column before '='.
+extern Option<bool>
+indent_off_after_assign; // = false
+
 // Whether to align continued statements at the '('. If false or the '(' is
 // followed by a newline, the next line indent is one tab.
 extern Option<bool>
 indent_align_paren; // = true
+
+// (OC) Whether to indent Objective-C code inside message selectors.
+extern Option<bool>
+indent_oc_inside_msg_sel; // = false
 
 // (OC) Whether to indent Objective-C blocks at brace level instead of usual
 // rules.
@@ -1570,6 +1596,14 @@ indent_token_after_brace; // = true
 extern Option<bool>
 indent_cpp_lambda_body;
 
+// How to indent compound literals that are being returned.
+// true: add both the indent from return & the compound literal open brace (ie:
+//       2 indent levels)
+// false: only indent 1 level, don't add the indent for the open brace, only add
+//        the indent for the return.
+extern Option<bool>
+indent_compound_literal_return; // = true
+
 // (C#) Whether to indent a 'using' block if no braces are used.
 extern Option<bool>
 indent_using_block; // = true
@@ -1581,6 +1615,14 @@ indent_using_block; // = true
 // 2: When the `:` is a continuation, indent it under `?`
 extern BoundedOption<unsigned, 0, 2>
 indent_ternary_operator;
+
+// Whether to indent the statments inside ternary operator.
+extern Option<bool>
+indent_inside_ternary_operator; // false
+
+// If true, the indentation of the chunks after a `return` sequence will be set at return indentation column.
+extern Option<bool>
+indent_off_after_return;
 
 // If true, the indentation of the chunks after a `return new` sequence will be set at return indentation column.
 extern Option<bool>
@@ -1625,7 +1667,7 @@ extern Option<bool>
 nl_cs_property_leave_one_liners;
 
 // Don't split one-line function definitions, as in 'int foo() { return 0; }'.
-// night modify nl_func_type_name
+// might modify nl_func_type_name
 extern Option<bool>
 nl_func_leave_one_liners;
 
@@ -1765,6 +1807,10 @@ nl_else_brace;
 // Add or remove newline between 'else' and 'if'.
 extern Option<iarf_e>
 nl_else_if;
+
+// Add or remove newline before '{' opening brace
+extern Option<iarf_e>
+nl_before_opening_brace_func_class_def;
 
 // Add or remove newline before 'if'/'else if' closing parenthesis.
 extern Option<iarf_e>
@@ -2080,6 +2126,10 @@ nl_func_decl_args;
 extern Option<iarf_e>
 nl_func_def_args;
 
+// Add or remove newline after each ',' in a function call.
+extern Option<iarf_e>
+nl_func_call_args;
+
 // Whether to add a newline after each ',' in a function declaration if '('
 // and ')' are in different lines. If false, nl_func_decl_args is used instead.
 extern Option<bool>
@@ -2133,6 +2183,10 @@ nl_func_call_empty;
 extern Option<iarf_e>
 nl_func_call_start;
 
+// Whether to add a newline before ')' in a function call.
+extern Option<iarf_e>
+nl_func_call_end;
+
 // Whether to add a newline after '(' in a function call if '(' and ')' are in
 // different lines.
 extern Option<bool>
@@ -2147,6 +2201,10 @@ nl_func_call_args_multi_line;
 // different lines.
 extern Option<bool>
 nl_func_call_end_multi_line;
+
+// Whether to respect nl_func_call_XXX option incase of closure args.
+extern Option<bool>
+nl_func_call_args_multi_line_ignore_closures; // false
 
 // Whether to add a newline after '<' of a template parameter list.
 extern Option<bool>
@@ -2320,7 +2378,7 @@ nl_before_return;
 extern Option<bool>
 nl_after_return;
 
-// (Java) Whether to put a blank line before a member '.' or '->' operators.
+// Whether to put a blank line before a member '.' or '->' operators.
 extern Option<iarf_e>
 nl_before_member;
 
@@ -2642,6 +2700,30 @@ nl_after_annotation;
 // (Java) Add or remove newline between two annotations.
 extern Option<iarf_e>
 nl_between_annotation;
+
+// The number of newlines before a whole-file #ifdef.
+//
+// 0: No change (default).
+extern BoundedOption<unsigned, 0, 16>
+nl_before_whole_file_ifdef;
+
+// The number of newlines after a whole-file #ifdef.
+//
+// 0: No change (default).
+extern BoundedOption<unsigned, 0, 16>
+nl_after_whole_file_ifdef;
+
+// The number of newlines before a whole-file #endif.
+//
+// 0: No change (default).
+extern BoundedOption<unsigned, 0, 16>
+nl_before_whole_file_endif;
+
+// The number of newlines after a whole-file #endif.
+//
+// 0: No change (default).
+extern BoundedOption<unsigned, 0, 16>
+nl_after_whole_file_endif;
 
 //END
 
@@ -3093,6 +3175,12 @@ align_oc_msg_colon_first;
 extern Option<bool>
 align_oc_decl_colon;
 
+// (OC) Whether to not align parameters in an Objectve-C message call if first
+// colon is not on next line of the message call (the same way Xcode does
+// aligment)
+extern Option<bool>
+align_oc_msg_colon_xcode_like;
+
 //END
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -3374,6 +3462,30 @@ mod_sort_using;
 extern Option<bool>
 mod_sort_include;
 
+// Whether to prioritize '#include' and '#import' statements that contain
+// filename without extension when sorting is enabled.
+extern Option<bool>
+mod_sort_incl_import_prioritize_filename;
+
+// Whether to prioritize '#include' and '#import' statements that does not
+// contain extensions when sorting is enabled.
+extern Option<bool>
+mod_sort_incl_import_prioritize_extensionless;
+
+// Whether to prioritize '#include' and '#import' statements that contain
+// angle over quotes when sorting is enabled.
+extern Option<bool>
+mod_sort_incl_import_prioritize_angle_over_quotes;
+
+// Whether to ignore file extension in '#include' and '#import' statements
+// for sorting comparison.
+extern Option<bool>
+mod_sort_incl_import_ignore_extension;
+
+// Whether to group '#include' and '#import' statements when sorting is enabled.
+extern Option<bool>
+mod_sort_incl_import_grouping_enabled;
+
 // Whether to move a 'break' that appears after a fully braced 'case' before
 // the close brace, as in 'case X: { ... } break;' => 'case X: { ... break; }'.
 extern Option<bool>
@@ -3589,6 +3701,12 @@ use_sp_after_angle_always;
 extern Option<bool>
 use_options_overriding_for_qt_macros; // = true
 
+// If true: the form feed character is removed from the list
+// of whitespace characters.
+// See https://en.cppreference.com/w/cpp/string/byte/isspace
+extern Option<bool>
+use_form_feed_no_more_as_whitespace_character;
+
 //END
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -3598,6 +3716,20 @@ use_options_overriding_for_qt_macros; // = true
 // in a C# verbatim string literal.
 extern BoundedOption<unsigned, 1, 3>
 warn_level_tabs_found_in_verbatim_string_literals; // = LWARN
+
+// For debugging purpose only.
+
+// Limit the number of loops.
+// Used by uncrustify.cpp to exit from infinite loop.
+// 0: no limit.
+extern Option<signed>
+debug_max_number_of_loops;
+
+// Set the number of the line to protocol;
+// Used in the function prot_the_line if the 2. parameter is zero.
+// 0: nothing protocol.
+extern Option<signed>
+debug_line_number_to_protocol;
 
 //END
 

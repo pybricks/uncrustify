@@ -124,6 +124,8 @@
 00202  case-2.cfg                           c/case.c
 00203  case-3.cfg                           c/case.c
 00204  bug_1718.cfg                         c/bug_1718.c
+00205  nl_before_return_false.cfg           c/case-nl_before_return.c
+00206  nl_before_return_true.cfg            c/case-nl_before_return.c
 
 
 # structure initializers
@@ -157,6 +159,7 @@
 00417  align_sf_call_thresh_417.cfg         c/align_sf_call_thresh_417.c
 00418  align_sf_call_span_418.cfg           c/align_sf_call_span_418.c
 00419  align_sf_call_span_419.cfg           c/align_sf_call_span_419.c
+00420  Issue-2278.cfg                       c/Issue-2278.c
 
 00421  nl_ds_struct_enum_cmt-t.cfg          c/nl_ds_struct_enum.c
 00422  nl_ds_struct_enum-2.cfg              c/nl_ds_struct_enum.c
@@ -186,6 +189,7 @@
 00511  bool-pos-sol-break.cfg               c/bool-pos.c
 00512  bool-pos-eol-force.cfg               c/bool-pos.c
 00513  bool-pos-sol-force.cfg               c/bool-pos.c
+00514  my_conf.cfg                          c/my_infile.c
 
 00600  indent_columns-3.cfg                 c/dos.c
 00601  indent_columns-3.cfg                 c/mac.c
@@ -201,6 +205,7 @@
 
 00620  ben_083.cfg                          c/indent-assign.c
 00621  nl_endif.cfg                         c/nl_endif.c
+00622  indent_assign.cfg                    c/indent-off-after-assign.c
 
 00631  nl_assign1.cfg                       c/nl_assign.c
 00632  nl_assign2.cfg                       c/nl_assign.c
@@ -312,6 +317,7 @@
 02411  pp_if_indent-1.cfg                   c/ifdef-indent.c
 02412  pp_if_indent-2.cfg                   c/ifdef-indent.c
 02413  pp_if_indent-3.cfg                   c/ifdef-indent.c
+02414  nl_whole_file_ifdef.cfg              c/whole_file_ifdef.c
 
 02415  endif.cfg                            c/endif.c
 02416  cmt_nl_end.cfg                       c/cmt_nl_end.c
@@ -333,6 +339,7 @@
 
 02455  mod_paren_on_return-a.cfg            c/macro-returns.c
 02456  mod_paren_on_return-r.cfg            c/macro-returns.c
+02457  nl_before_return_true.cfg            c/nl_before_return.c
 
 02460  freebsd.cfg                          c/freebsd.c
 
@@ -378,6 +385,8 @@
 09617  Issue_2360-a.cfg                     c/Issue_2360.c
 09618  Issue_2360-b.cfg                     c/Issue_2360.c
 09619  Issue_2411.cfg                       c/Issue_2411.c
+09620  Issue_2640.cfg                       c/Issue_2640.c
+09621  preproc-cleanup.cfg                  c/pp-before-func-def.c
 
 10005  empty.cfg                            c/i1270.c
 
@@ -385,3 +394,11 @@
 
 10007  indent_macro_brace-true.cfg          c/indent-macro-brace.c
 10008  indent_macro_brace-false.cfg         c/indent-macro-brace.c
+
+10009  empty.cfg                            c/return-compound-literal.c
+10010  indent_compound_literal_return-false.cfg c/return-compound-literal.c
+10011  indent_compound_literal_return-true.cfg c/return-compound-literal.c
+
+10012  indent_sparen_extra-8.cfg            c/sparen-indent.c
+10013  empty.cfg                            c/sparen-indent.c
+10014  indent_continue-8.cfg                c/sparen-indent.c

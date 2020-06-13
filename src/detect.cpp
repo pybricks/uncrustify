@@ -35,7 +35,8 @@ protected:
 
 public:
    sp_votes(Option<iarf_e> &opt)
-      : m_option(opt) {}
+      : m_option(opt)
+   {}
 
    //! Figure out the result of the vote and maybe update *m_av
    ~sp_votes();
@@ -329,7 +330,7 @@ static void detect_space_options(void)
 
       if (chunk_is_token(pc, CT_SEMICOLON))
       {
-         if (pc->parent_type == CT_FOR)
+         if (get_chunk_parent_type(pc) == CT_FOR)
          {
             if (chunk_is_token(prev, CT_SPAREN_OPEN))
             {
